@@ -58,3 +58,4 @@ Prioritized follow-up work for turning the current Forest Sketch research protot
 
 - [x] Reorder notebooks so the UMAP study is notebook 03 and the related dimensionality, expansion, concatenation, and iteration studies are adjacent.
 - [x] Add `Results.md` with the executed result for every hypothesis and the preliminary initial-projection study.
+- [x] Add an executed dimensionality-scaling study varying input width, forest size, and projected width.

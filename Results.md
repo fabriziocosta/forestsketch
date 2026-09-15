@@ -16,6 +16,7 @@ This document compiles the results printed by the executed hypothesis notebooks.
 | Question 2: tree-path value | `10_q2_hypothesis_tree_path_value.ipynb` | Supported: real tree paths outperformed the matched random sparse control. |
 | Question 5: sample efficiency | `11_q5_hypothesis_sample_efficiency.ipynb` | Not supported: the low-data Forest Sketch advantage was -0.008. |
 | Question 6: quality-cost trade-off | `12_q6_hypothesis_cost_tradeoff.ipynb` | Not supported in the tested cost envelope; accuracy was 0.016 below the original baseline. |
+| Dimensionality scaling relationship | `14_dimension_scaling_relationship.ipynb` | Exploratory study: the useful scale differed across input widths and forest sizes; both $d/p$ and $d/m$ should be inspected rather than assuming one universal absolute dimension. |
 
 ## Preliminary question — initial projection
 
@@ -108,3 +109,9 @@ Expanding minus narrow fixed mode was +0.043, with 95% CI [0.021, 0.066]. Agains
 ## Overall interpretation
 
 The experiments provide evidence that real tree-path features contain signal beyond a matched random sparse control. They do not yet establish that the complete iterative Forest Sketch architecture improves predictive performance over simpler baselines. In particular, later fixed-width iterations were harmful in the current study, and expanding dimensionality did not beat a width-matched fixed representation.
+
+## Exploratory dimensionality scaling
+
+Notebook 14 varied controlled classification problems with $p \in \{16, 64, 128\}$, forests with 8 or 32 trees, and projected widths $d \in \{256, 2048, 8192\}$. It used 900 samples, maximum tree depth 5, two paired seeds, and fully parallel random forests. The uncompressed path width $m$ was measured from the fitted forest rather than inferred from $p$.
+
+The best observed mean sketch accuracy was 0.883 for $p=16$, 32 trees, and $d=2048$; the corresponding raw-forest mean was 0.857. For $p=64$ and 32 trees, the best observed sketch mean was 0.794 at $d=2048$, versus a raw-forest mean of 0.710. For $p=128$ and 32 trees, the best observed sketch mean was 0.754 at $d=8192$, versus a raw-forest mean of 0.698. These results do not support a single universal rule based only on $p$ or only on $m$: the notebook reports $d/p$, $d/m$, path width, runtime, and serialized model size so the relationship can be studied directly. The experiment is exploratory and should be repeated on real datasets and with larger forests before changing the other hypothesis notebooks.
