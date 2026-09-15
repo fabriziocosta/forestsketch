@@ -19,6 +19,7 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
         estimator,
         n_components=64,
         n_iterations=1,
+        dimension_mode="fixed",
         initial_projection_type="sparse",
         path_projection_type="gaussian",
         concat_projection_type="sparse",
@@ -30,6 +31,7 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
         self.estimator = estimator
         self.n_components = n_components
         self.n_iterations = n_iterations
+        self.dimension_mode = dimension_mode
         self.initial_projection_type = initial_projection_type
         self.path_projection_type = path_projection_type
         self.concat_projection_type = concat_projection_type
@@ -93,15 +95,20 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
             Z = path_projector.transform(V_normalized)
 
             C = _hstack(X_current, Z)
-            concat_normalizer = self._make_normalizer()
-            C_normalized = concat_normalizer.fit_transform(C)
-            concat_projector = make_projector(
-                self.n_components,
-                self.concat_projection_type,
-                projection_seeds[2 + 2 * iteration],
-            )
-            concat_projector.fit(C_normalized)
-            X_current = concat_projector.transform(C_normalized)
+            if self.dimension_mode == "fixed":
+                concat_normalizer = self._make_normalizer()
+                C_normalized = concat_normalizer.fit_transform(C)
+                concat_projector = make_projector(
+                    self.n_components,
+                    self.concat_projection_type,
+                    projection_seeds[2 + 2 * iteration],
+                )
+                concat_projector.fit(C_normalized)
+                X_current = concat_projector.transform(C_normalized)
+            else:
+                concat_normalizer = None
+                concat_projector = None
+                X_current = C
 
             self.forests_.append(forest)
             self.path_encoders_.append(encoder)
@@ -110,7 +117,11 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
             self.concat_normalizers_.append(concat_normalizer)
             self.concat_projectors_.append(concat_projector)
 
-        self.n_components_out_ = self.n_components
+        self.n_components_out_ = (
+            self.n_components
+            if self.dimension_mode == "fixed"
+            else self.n_components * (self.n_iterations + 1)
+        )
         self.projection_matrices_ = {
             "P0": getattr(self.initial_projector_, "components_", None),
             "PZ": [
@@ -119,6 +130,8 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
             ],
             "PC": [
                 getattr(projector, "components_", None)
+                if projector is not None
+                else None
                 for projector in self.concat_projectors_
             ],
         }
@@ -171,8 +184,11 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
             V_normalized = self.path_normalizers_[iteration].transform(V)
             Z = self.path_projectors_[iteration].transform(V_normalized)
             C = _hstack(X_current, Z)
-            C_normalized = self.concat_normalizers_[iteration].transform(C)
-            X_next = self.concat_projectors_[iteration].transform(C_normalized)
+            if self.dimension_mode == "fixed":
+                C_normalized = self.concat_normalizers_[iteration].transform(C)
+                X_next = self.concat_projectors_[iteration].transform(C_normalized)
+            else:
+                X_next = C
 
             if return_intermediates:
                 trace.append(
@@ -202,6 +218,8 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
             raise ValueError("n_components must be a positive integer")
         if not isinstance(self.n_iterations, (int, np.integer)) or self.n_iterations < 0:
             raise ValueError("n_iterations must be a non-negative integer")
+        if self.dimension_mode not in {"fixed", "expanding"}:
+            raise ValueError("dimension_mode must be 'fixed' or 'expanding'")
 
     def _validate_forest_estimator(self):
         if not isinstance(

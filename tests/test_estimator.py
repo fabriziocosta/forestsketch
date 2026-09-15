@@ -63,6 +63,32 @@ def test_regressor_is_supported():
     assert output.shape == (30, 4)
 
 
+def test_expanding_dimension_mode_retains_each_tree_representation():
+    X, y = make_classification(
+        n_samples=48,
+        n_features=8,
+        n_informative=5,
+        random_state=1,
+    )
+    sketch = ForestSketchEstimator(
+        estimator=RandomForestClassifier(n_estimators=8, max_depth=4, random_state=11),
+        n_components=5,
+        n_iterations=2,
+        dimension_mode="expanding",
+        random_state=19,
+    )
+
+    output = sketch.fit_transform(X, y)
+    final, trace = sketch.transform_with_intermediates(X[:7])
+
+    assert output.shape == (48, 15)
+    assert final.shape == (7, 15)
+    assert [item["C"].shape[1] for item in trace] == [10, 15]
+    assert [item["X_next"].shape[1] for item in trace] == [10, 15]
+    assert sketch.projection_matrices_["PC"] == [None, None]
+    assert len(sketch.get_feature_names_out()) == 15
+
+
 def test_signed_hash_projector_is_deterministic_and_sparse():
     X = sparse.csr_matrix(
         [

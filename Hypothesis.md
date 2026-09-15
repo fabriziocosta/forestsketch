@@ -118,6 +118,18 @@ Evaluate a logarithmic grid of target dimensions and compare performance, storag
 
 **Falsification:** performance is highly unstable or requires a dimension so large that the compression is not useful.
 
+## Question 8: Is expanding dimensionality better than fixed-dimensional re-embedding?
+
+**Hypothesis.** Retaining each projected tree representation through concatenation, so that the representation grows by d features per iteration, improves held-out predictive performance relative to projecting every concatenation back to d features.
+
+**Experiment.** On identical train, validation, and test splits, compare `dimension_mode="fixed"` and `dimension_mode="expanding"` at the same initial block dimension d and iteration count T. Use the same supplied forest configuration, projection seeds, downstream estimator, and repeated model seeds. Report both predictive performance and final dimensionality, and include a width-matched fixed-dimensional control where practical.
+
+**Measure.** The primary measure is the paired held-out accuracy difference between expanding and fixed modes. Secondary measures are representation width, wall-clock fit time, and serialized fitted-estimator size. A paired confidence interval across seeds is required before calling the hypothesis supported.
+
+**Evidence for the hypothesis:** expanding mode has a reproducible positive held-out gain that remains after accounting for its larger representation, or achieves the same performance with a smaller initial block dimension.
+
+**Falsification:** expanding mode does not improve held-out performance, its gain disappears under width-matched comparison, or its added width and cost are not justified by the gain.
+
 ## Recommended primary claim
 
 The strongest initial claim would be:

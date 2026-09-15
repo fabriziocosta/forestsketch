@@ -7,7 +7,7 @@ Forest Sketch is an iterative representation-learning architecture built from tw
 1. A random forest converts an input representation into high-dimensional sparse features that describe the nodes visited by each tree.
 2. A random projection compresses those sparse features to a user-defined dimension.
 
-The compressed tree representation is concatenated with the representation entering the current iteration and projected back to the same fixed dimension. The result becomes the input to the next random-forest stage.
+The compressed tree representation is concatenated with the representation entering the current iteration. By default the concatenation is projected back to the same fixed dimension. An expanding mode can retain the concatenation, so the next representation grows by d columns per iteration.
 
 ## Internal forest estimator
 
@@ -28,6 +28,8 @@ The initial component boundaries are:
 - normalizer: leaves data unchanged or applies a documented normalization policy;
 - projector: materializes or deterministically generates a projection from an input dimension to d;
 - iteration coordinator: concatenates representations and applies the stage-specific projector.
+
+The iteration coordinator exposes `dimension_mode="fixed"` and `dimension_mode="expanding"`. Fixed mode applies Pₜᶜ after every concatenation. Expanding mode skips Pₜᶜ and passes Cₜ directly to the next forest.
 
 ForestSketchEstimator should compose these components rather than hard-code one implementation. This makes it possible to compare materialized random projections, on-the-fly signed hashing, different normalizers, and different path encoders under the same estimator interface.
 
@@ -114,7 +116,7 @@ C_t = [X_t \; || \; Z_t],
 C_t \in \mathbb{R}^{n \times 2d}
 $$
 
-A third projection maps the concatenated representation back to dimension d:
+A third projection maps the concatenated representation back to dimension d in fixed mode:
 
 $$
 X_{t+1} = C_t P_t^C,
@@ -138,7 +140,7 @@ Xₜ
                               └──► project with Pₜᶜ: Xₜ₊₁
 ~~~
 
-The next forest operates on Xₜ₊₁. After T iterations, the final representation is the current X representation at t = T.
+The next forest operates on Xₜ₊₁. After T iterations, the final representation is the current X representation at t = T. In fixed mode, Xₜ has d columns for every t. In expanding mode, Xₜ has (t + 1)d columns and Cₜ has (t + 2)d columns.
 
 ## Intermediate representations
 
@@ -156,7 +158,7 @@ This keeps ForestSketchEstimator compatible with ordinary scikit-learn Pipeline 
 
 ## End-to-end algorithm
 
-Given original input X, target dimension d, and number of iterations T:
+Given original input X, target dimension d, number of iterations T, and a dimension mode:
 
 ~~~text
 X₀ = project_to_dimension_d(X)
@@ -167,7 +169,10 @@ for t in 0, ..., T - 1:
     V_t = collect_visited_internal_and_leaf_nodes(forest_t, X_current)
     Z_t = project_with_P_t^Z(V_t)
     C_t = concatenate(X_current, Z_t)
-    X_current = project_with_P_t^C(C_t)
+    if dimension_mode == "fixed":
+        X_current = project_with_P_t^C(C_t)
+    else:
+        X_current = C_t
 
 return X_current
 ~~~
@@ -176,13 +181,13 @@ For supervised learning, the forest-fitting step may use the target y. For unsup
 
 ## Projection matrix dimensions
 
-With samples stored as rows, the three projection matrices are:
+With samples stored as rows, the projection matrices are:
 
 | Matrix | Shape | Maps |
 | --- | --- | --- |
 | P₀ | p × d | Original features to the initial representation X₀ |
 | Pₜᶻ | mₜ × d | Sparse forest-path features Vₜ to tree representation Zₜ |
-| Pₜᶜ | 2d × d | Concatenated representation Cₜ to next representation Xₜ₊₁ |
+| Pₜᶜ | 2d × d | Concatenated representation Cₜ to next representation Xₜ₊₁ in fixed mode |
 
 The corresponding data dimensions are:
 
@@ -190,13 +195,13 @@ The corresponding data dimensions are:
 | --- | --- | --- |
 | X | n × p | Original input features |
 | X₀ | n × d | Initial representation |
-| Xₜ | n × d | Representation entering iteration t |
+| Xₜ | n × d in fixed mode; n × (t + 1)d in expanding mode | Representation entering iteration t |
 | Vₜ | n × mₜ | Sparse visited-node features |
 | Zₜ | n × d | Compressed tree representation |
-| Cₜ | n × 2d | Concatenation of Xₜ and Zₜ |
-| Xₜ₊₁ | n × d | Representation entering the next iteration |
+| Cₜ | n × 2d in fixed mode; n × (t + 2)d in expanding mode | Concatenation of Xₜ and Zₜ |
+| Xₜ₊₁ | n × d in fixed mode; n × (t + 2)d in expanding mode | Representation entering the next iteration |
 
-In scikit-learn, the stored components_ array uses the transpose orientation: (d, p) for P₀, (d, mₜ) for Pₜᶻ, and (d, 2d) for Pₜᶜ.
+In scikit-learn, the stored components_ array uses the transpose orientation: (d, p) for P₀, (d, mₜ) for Pₜᶻ, and (d, 2d) for Pₜᶜ. Expanding mode has no concatenation projection, so its corresponding entry in `projection_matrices_["PC"]` is `None`.
 
 ## Training and inference
 

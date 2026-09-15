@@ -61,7 +61,21 @@ X_train_sketch = sketch.fit_transform(X_train, y_train)
 X_test_sketch = sketch.transform(X_test)
 ~~~
 
-The output of both calls should have shape n_samples × n_components.
+With the default `dimension_mode="fixed"`, both calls have shape n_samples × n_components. With `dimension_mode="expanding"`, the output has n_components × (n_iterations + 1) columns because each projected tree representation is retained.
+
+To retain the concatenated representation instead of projecting it back to the same width:
+
+~~~python
+expanding_sketch = ForestSketchEstimator(
+    estimator=RandomForestClassifier(n_estimators=100, random_state=7),
+    n_components=32,
+    n_iterations=3,
+    dimension_mode="expanding",
+    random_state=42,
+)
+X_expanded = expanding_sketch.fit_transform(X_train, y_train)
+# X_expanded.shape == (n_samples, 32 * (3 + 1))
+~~~
 
 For experiments and diagnostics, the estimator should provide an opt-in method that returns the final representation and the per-iteration trace:
 
@@ -86,6 +100,7 @@ The first implementation is expected to expose:
 | estimator | Configured RandomForestClassifier or RandomForestRegressor used internally |
 | n_components | Target dimension of the compact representation |
 | n_iterations | Number of forest, path-extraction, and projection cycles |
+| dimension_mode | `fixed` projects each concatenation back to n_components; `expanding` retains each n_components tree block |
 | random_state | Seed for projection generation; the forest seed is configured on estimator |
 | initial_projection_type | Projection family for the original input projection |
 | path_projection_type | Projection family for sparse forest-path features |
@@ -125,12 +140,13 @@ for each iteration t:
     Vₜ = collect_all_visited_internal_and_leaf_nodes(forest_t, X_current)
     Zₜ = Vₜ projected to n_components
     Cₜ = concatenate(X_current, Zₜ)
-    X_current = Cₜ projected back to n_components
+    X_current = Cₜ projected back to n_components when dimension_mode="fixed";
+                  otherwise X_current = Cₜ
 
 return X_current
 ~~~
 
-The initial projection ensures that the first forest receives the configured representation dimension. At every later iteration, the forest input and output remain compact even though the intermediate visited-node matrix may be very wide.
+The initial projection ensures that the first forest receives the configured representation dimension. In fixed mode, every later forest also receives n_components features. In expanding mode, Xₜ grows by n_components columns per iteration, while the visited-node matrix remains wide and sparse.
 
 ## Learned state and reproducibility
 
@@ -139,7 +155,7 @@ Forest Sketch should materialize and retain all learned components during fit:
 - the initial projection matrix;
 - the cloned forest fitted at each iteration;
 - the path-feature projection matrix for each iteration;
-- the concatenation projection matrix for each iteration;
+- the concatenation projection matrix for each iteration in fixed mode;
 - the global node-column layout for each forest.
 
 The same state must be reused by transform. A random seed is useful for reproducibility metadata, but inference should not regenerate projection matrices from the seed.
@@ -170,6 +186,8 @@ The hypothesis studies are split into dedicated executable notebooks:
 - `10_hypothesis_target_dimension.ipynb` — accuracy and storage across target dimensions.
 
 Each notebook prints an explicit exploratory verdict and stores its tables and plots after execution.
+
+- `12_hypothesis_expanding_dimension.ipynb` — expanding versus fixed dimensionality.
 
 ## Versioning and releases
 
