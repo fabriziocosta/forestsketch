@@ -21,7 +21,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 from sklearn.utils.validation import check_array, check_is_fitted
 
-from forestsketch import DecisionPathEncoder, ForestSketchEstimator, make_projector
+from forestsketch import DecisionPathEncoder, RecursiveSketchClassifier, make_projector
 
 
 CLASSIFICATION_SEEDS = (0, 1, 2)
@@ -362,7 +362,7 @@ def openml_output_classifier(
     seed=42,
     n_estimators=DEFAULT_N_ESTIMATORS,
 ):
-    """Construct a downstream classifier for an OpenML Forest Sketch output."""
+    """Construct a downstream classifier for an OpenML Recursive Sketch output."""
     if classifier == "logistic_regression":
         return openml_downstream_classifier(seed)
     if classifier == "random_forest":
@@ -412,7 +412,7 @@ class OneShotTreePathTransformer(BaseEstimator, TransformerMixin):
         return self.projector_.transform(self.encoder_.transform(X))
 
 
-class NoConcatForestSketch(BaseEstimator, TransformerMixin):
+class NoConcatRecursiveSketch(BaseEstimator, TransformerMixin):
     """Iteration ablation that replaces X with Z instead of concatenating."""
 
     def __init__(self, estimator, n_components=32, n_iterations=1, random_state=None):
@@ -515,7 +515,7 @@ def full_sketch(
         if kind == "classifier"
         else forest_regressor(seed, n_estimators=n_estimators)
     )
-    return ForestSketchEstimator(
+    return RecursiveSketchClassifier(
         estimator=estimator,
         n_components=n_components,
         n_iterations=n_iterations,
@@ -530,7 +530,7 @@ def full_sketch(
     )
 
 
-forest_sketch = full_sketch
+recursive_sketch = full_sketch
 
 
 def timed_fit_transform(transformer, X, y):

@@ -2,7 +2,7 @@
 
 ## What is being tried
 
-This pass tests the initial rule of thumb that fixed-width Forest Sketch studies should use an internal random forest with `n_estimators=100`, `n_jobs=-1`, and target dimension `d = 20 * p`, where `p` is the actual input feature count for that notebook's dataset. Each notebook must print or record its computed `p` and `d`; expected `DataDimensionalityWarning` messages may be suppressed, but real execution errors must remain visible.
+This pass tests the initial rule of thumb that fixed-width Recursive Sketch studies should use an internal random forest with `n_estimators=100`, `n_jobs=-1`, and target dimension `d = 20 * p`, where `p` is the actual input feature count for that notebook's dataset. Each notebook must print or record its computed `p` and `d`; expected `DataDimensionalityWarning` messages may be suppressed, but real execution errors must remain visible.
 
 Notebook 14 remains the multi-factor reference with its full p/m/d grid and is not collapsed to one fixed dimension. Notebook 03 remains a 2D UMAP visualization, and notebooks 04 and 13 remain target-dimension sweeps/curves; these special designs are not converted to one `d=20p` setting. Their forests use 100 trees where practical, while notebook 14 retains its established 100/500-tree scaling grid.
 

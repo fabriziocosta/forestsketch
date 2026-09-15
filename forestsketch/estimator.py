@@ -1,4 +1,4 @@
-"""The public Forest Sketch transformer."""
+"""The public Recursive Sketch transformer."""
 
 from numbers import Real
 
@@ -18,8 +18,8 @@ from .path_encoder import DecisionPathEncoder
 from .projectors import make_projector
 
 
-class ForestSketchEstimator(BaseEstimator, TransformerMixin):
-    """Iteratively encode random-forest paths into compact representations."""
+class RecursiveSketchClassifier(BaseEstimator, TransformerMixin):
+    """Iteratively encode forest paths or transformer outputs into representations."""
 
     def __init__(
         self,
@@ -69,11 +69,10 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
 
     def _fit(self, X, y, sample_weight=None, return_training_output=False):
         self._validate_parameters()
-        self._validate_forest_estimator()
+        self._validate_path_estimator()
         if y is None:
             raise ValueError(
-                "y is required because estimator must be a fitted random-forest "
-                "classifier or regressor"
+                "y is required because the path estimator is supervised"
             )
 
         feature_names = self._get_feature_names(X)
@@ -113,15 +112,24 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
 
         for iteration in range(self.n_iterations):
             forest = clone(self.estimator)
-            forest.fit(X_current, y, sample_weight=sample_weight)
+            if sample_weight is None:
+                forest.fit(X_current, y)
+            else:
+                forest.fit(X_current, y, sample_weight=sample_weight)
 
-            encoder = (
-                clone(self.path_encoder)
-                if self.path_encoder is not None
-                else DecisionPathEncoder()
-            )
-            encoder.fit(forest)
-            V = encoder.transform(X_current)
+            if self.path_encoder is None and self._uses_estimator_transform(forest):
+                # A generic path estimator owns both fitting and path-matrix
+                # construction, e.g. RecursivePartitionClassifier.
+                encoder = forest
+                V = forest.transform(X_current)
+            else:
+                encoder = (
+                    clone(self.path_encoder)
+                    if self.path_encoder is not None
+                    else DecisionPathEncoder()
+                )
+                encoder.fit(forest)
+                V = encoder.transform(X_current)
 
             path_normalizer = self._make_normalizer("path")
             V_normalized = self._fit_transform_normalizer(path_normalizer, V)
@@ -199,7 +207,7 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
                     "input_features is not equal to the feature names seen during fit"
                 )
         return np.asarray(
-            [f"forestsketch_{index}" for index in range(self.n_components_out_)],
+            [f"recursivesketch_{index}" for index in range(self.n_components_out_)],
             dtype=object,
         )
 
@@ -219,7 +227,7 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
         if X.shape[1] != self.n_features_in_:
             raise ValueError(
                 "X has "
-                f"{X.shape[1]} features, but ForestSketchEstimator was fitted "
+                f"{X.shape[1]} features, but RecursiveSketchClassifier was fitted "
                 f"with {self.n_features_in_} features"
             )
 
@@ -293,15 +301,21 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
             return int(self.n_components)
         return max(1, int(np.ceil(self.dimension_ratio * n_features)))
 
-    def _validate_forest_estimator(self):
-        if not isinstance(
-            self.estimator,
-            (RandomForestClassifier, RandomForestRegressor),
-        ):
-            raise TypeError(
-                "estimator must be a RandomForestClassifier or "
-                "RandomForestRegressor"
-            )
+    def _validate_path_estimator(self):
+        if isinstance(self.estimator, (RandomForestClassifier, RandomForestRegressor)):
+            return
+        if self._uses_estimator_transform(self.estimator):
+            return
+        raise TypeError(
+            "estimator must be a RandomForestClassifier, RandomForestRegressor, "
+            "or an estimator implementing fit and transform"
+        )
+
+    @staticmethod
+    def _uses_estimator_transform(estimator):
+        return callable(getattr(estimator, "fit", None)) and callable(
+            getattr(estimator, "transform", None)
+        )
 
     @staticmethod
     def _validate_X(X):
@@ -344,6 +358,11 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
         if self.output_format == "sparse" and not sparse.issparse(X):
             return sparse.csr_matrix(X)
         return X
+
+
+# Backward-compatible name retained for callers of releases before the
+# Recursive Sketch rename.
+ForestSketchEstimator = RecursiveSketchClassifier
 
 
 def _hstack(left, right):

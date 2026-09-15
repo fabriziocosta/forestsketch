@@ -1,8 +1,8 @@
-# Forest Sketch
+# Recursive Sketch
 
 ## Overview
 
-Forest Sketch is an iterative representation-learning architecture built from two operations:
+Recursive Sketch is an iterative representation-learning architecture built from two operations:
 
 1. A random forest converts an input representation into high-dimensional sparse features that describe the nodes visited by each tree.
 2. A random projection compresses those sparse features to a user-defined dimension.
@@ -11,15 +11,15 @@ The compressed tree representation is concatenated with the representation enter
 
 ## Internal forest estimator
 
-ForestSketchEstimator accepts a configured RandomForestClassifier or RandomForestRegressor through an estimator parameter. The supplied forest is a template for the internal forest stages; its tree count, depth, feature subsampling, fitting options, and forest random seed are configured independently from the projection parameters.
+RecursiveSketchClassifier accepts a configured RandomForestClassifier or RandomForestRegressor through an estimator parameter. The supplied forest is a template for the internal forest stages; its tree count, depth, feature subsampling, fitting options, and forest random seed are configured independently from the projection parameters.
 
 At every iteration, the implementation should clone the supplied estimator, fit the clone on the current representation Xₜ and target y, and use that fitted clone to produce Vₜ. Cloning prevents the caller's estimator object from being mutated and allows each iteration to retain its own fitted forest.
 
-The Forest Sketch projection settings control the target dimension, projection family, projection seeds, and number of iterations. They do not replace or silently override the configuration of the supplied forest.
+The Recursive Sketch projection settings control the target dimension, projection family, projection seeds, and number of iterations. They do not replace or silently override the configuration of the supplied forest.
 
 ## Modular implementation
 
-ForestSketchEstimator should be an orchestrator over replaceable components with scikit-learn-style interfaces. Each component should expose fit, transform, and fit_transform behavior where appropriate, and should be compatible with cloning and parameter inspection.
+RecursiveSketchClassifier should be an orchestrator over replaceable components with scikit-learn-style interfaces. Each component should expose fit, transform, and fit_transform behavior where appropriate, and should be compatible with cloning and parameter inspection.
 
 The initial component boundaries are:
 
@@ -36,7 +36,7 @@ is provided, the estimator resolves `n_components_ = ceil(dimension_ratio × p)`
 at fit time, where `p` is the number of input features. The existing absolute
 `n_components` behavior is retained when the ratio is omitted.
 
-ForestSketchEstimator should compose these components rather than hard-code one implementation. This makes it possible to compare materialized random projections, on-the-fly signed hashing, different normalizers, and different path encoders under the same estimator interface.
+RecursiveSketchClassifier should compose these components rather than hard-code one implementation. This makes it possible to compare materialized random projections, on-the-fly signed hashing, different normalizers, and different path encoders under the same estimator interface.
 
 ## Notation
 

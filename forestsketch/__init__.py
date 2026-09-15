@@ -1,6 +1,6 @@
-"""Forest Sketch: iterative random-forest path representations."""
+"""Recursive Sketch: iterative path-based representations."""
 
-from .estimator import ForestSketchEstimator
+from .estimator import ForestSketchEstimator, RecursiveSketchClassifier
 from .normalizers import IdentityNormalizer, RowNormalizer
 from .path_encoder import DecisionPathEncoder
 from .projectors import (
@@ -12,6 +12,7 @@ from .projectors import (
 __all__ = [
     "DecisionPathEncoder",
     "ForestSketchEstimator",
+    "RecursiveSketchClassifier",
     "IdentityNormalizer",
     "RowNormalizer",
     "SignedHashProjector",

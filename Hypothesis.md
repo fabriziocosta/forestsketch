@@ -2,7 +2,7 @@
 
 ## Aim
 
-The goal is to determine whether Forest Sketch produces a useful representation beyond simply using the original features or applying a one-time random projection. The experiments should establish both predictive value and the cost of obtaining that value.
+The goal is to determine whether Recursive Sketch produces a useful representation beyond simply using the original features or applying a one-time random projection. The experiments should establish both predictive value and the cost of obtaining that value.
 
 The method should not be considered universally superior from a single successful result. Evidence should come from repeated comparisons against strong baselines, ablations, and held-out data.
 
@@ -24,7 +24,7 @@ The method should not be considered universally superior from a single successfu
 | One-shot tree-path projection | Measures the value of forest node-path features without iteration |
 | Iterative method with no concatenation | Tests whether retaining the previous representation is important |
 | Iterative method with shuffled path features | Tests whether gains come from meaningful tree structure rather than extra random features |
-| Full Forest Sketch | Proposed method |
+| Full Recursive Sketch | Proposed method |
 
 All baselines should use comparable downstream models and, where possible, comparable feature and compute budgets.
 
@@ -134,7 +134,7 @@ Evaluate a logarithmic grid of target dimensions and compare performance, storag
 
 The strongest initial claim would be:
 
-> At a fixed representation dimension and comparable downstream model budget, Forest Sketch improves held-out predictive performance over original features, direct random projection, and a one-shot tree-path projection, with a cost that is justified by the improvement.
+> At a fixed representation dimension and comparable downstream model budget, Recursive Sketch improves held-out predictive performance over original features, direct random projection, and a one-shot tree-path projection, with a cost that is justified by the improvement.
 
 This claim is supported only if Questions 1–3 show consistent gains and Question 6 shows that the gains are not merely an artifact of an impractical computational budget.
 

@@ -1,10 +1,10 @@
-# Forest Sketch
+# Recursive Sketch
 
-Forest Sketch is an iterative representation-learning method that turns random-forest decision paths into compact feature vectors.
+Recursive Sketch is an iterative representation-learning method that turns random-forest decision paths into compact feature vectors.
 
 For each sample, the method records the internal decision nodes and terminal leaves visited by the trees in a forest. This creates a wide sparse representation that is then compressed with a random projection. The compressed tree representation is concatenated with the current input representation; by default, the concatenation is retained and the representation expands with each iteration. A fixed-width re-projection is available as an explicit alternative. The process can be repeated for several iterations.
 
-The project is intended to provide a scikit-learn-compatible transformer named ForestSketchEstimator. The transformer accepts a configured RandomForestClassifier or RandomForestRegressor through its estimator parameter and uses that forest internally at every iteration.
+The project is intended to provide a scikit-learn-compatible transformer named RecursiveSketchClassifier. The transformer accepts a configured RandomForestClassifier or RandomForestRegressor through its estimator parameter, or any cloneable supervised estimator exposing `fit(X, y)` and `transform(X)`. Random forests continue to use the built-in decision-path encoder; transformer estimators provide their own sparse or dense path matrix directly.
 
 ## Status
 
@@ -15,7 +15,7 @@ This repository contains an initial working implementation, together with the ar
 The estimator is a transformer: it learns a compact representation and can be placed inside a scikit-learn Pipeline with a downstream classifier or regressor. The internal forest estimator and the downstream estimator are configured independently.
 
 ~~~python
-from forestsketch import ForestSketchEstimator
+from forestsketch import RecursiveSketchClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import make_pipeline
@@ -28,7 +28,7 @@ forest = RandomForestClassifier(
 )
 
 model = make_pipeline(
-    ForestSketchEstimator(
+    RecursiveSketchClassifier(
         estimator=forest,
         n_components=64,
         n_iterations=3,
@@ -41,14 +41,14 @@ model.fit(X_train, y_train)
 y_pred = model.predict(X_test)
 ~~~
 
-The supplied forest controls the tree-path features generated inside Forest Sketch. The downstream estimator is deliberately separate. This makes it possible to configure the internal forest independently and evaluate the resulting representation with different scikit-learn models.
+The supplied forest controls the tree-path features generated inside Recursive Sketch. The downstream estimator is deliberately separate. This makes it possible to configure the internal forest independently and evaluate the resulting representation with different scikit-learn models.
 
 ## Direct transformation
 
 The transformer should also support the standard scikit-learn lifecycle:
 
 ~~~python
-sketch = ForestSketchEstimator(
+sketch = RecursiveSketchClassifier(
     estimator=RandomForestClassifier(
         n_estimators=100,
         n_jobs=-1,
@@ -74,7 +74,7 @@ compatibility.
 To retain the concatenated representation instead of projecting it back to the same width:
 
 ~~~python
-expanding_sketch = ForestSketchEstimator(
+expanding_sketch = RecursiveSketchClassifier(
     estimator=RandomForestClassifier(n_estimators=100, random_state=7),
     n_components=32,
     n_iterations=3,
@@ -93,7 +93,7 @@ The first implementation is expected to expose:
 
 | Parameter | Meaning |
 | --- | --- |
-| estimator | Configured RandomForestClassifier or RandomForestRegressor used internally |
+| estimator | Configured random forest, or a cloneable supervised estimator exposing `fit(X, y)` and `transform(X)`; the latter supplies its own path matrix |
 | n_components | Target dimension of the compact representation |
 | dimension_ratio | Optional positive ratio used to compute `ceil(dimension_ratio × p)` at fit time; takes precedence over `n_components` |
 | n_iterations | Number of forest, path-extraction, and projection cycles |
@@ -116,7 +116,7 @@ the legacy `normalizer` is cloned, and otherwise the `normalization` factory cre
 the built-in normalizer. Each fit stage and iteration receives its own clone, so no
 fitted normalizer instance is shared.
 
-The internal forest should be cloned before fitting so that ForestSketchEstimator does not mutate the estimator object supplied by the caller. Its forest hyperparameters, including tree count, depth, feature subsampling, parallelism through `n_jobs`, and forest random seed, are configured directly on estimator. The projection parameters remain ForestSketchEstimator parameters. `fit(X, y, sample_weight=...)` forwards sample weights to every cloned forest stage.
+The internal forest should be cloned before fitting so that RecursiveSketchClassifier does not mutate the estimator object supplied by the caller. Its forest hyperparameters, including tree count, depth, feature subsampling, parallelism through `n_jobs`, and forest random seed, are configured directly on estimator. The projection parameters remain RecursiveSketchClassifier parameters. `fit(X, y, sample_weight=...)` forwards sample weights to every cloned forest stage.
 
 `fit_transform` reuses the representation computed during fitting. This avoids refitting forests or recomputing the training path representation merely to return the training output.
 
@@ -124,9 +124,9 @@ The exact parameter names may be refined to follow scikit-learn conventions, but
 
 ## Modular components
 
-ForestSketchEstimator should be composed from replaceable components with standard scikit-learn-style interfaces:
+RecursiveSketchClassifier should be composed from replaceable components with standard scikit-learn-style interfaces:
 
-- the supplied forest estimator;
+- the supplied forest or path-transformer estimator;
 - a path encoder for visited internal and leaf nodes;
 - a normalizer, including an identity normalizer for the no-normalization condition;
 - a projector, including materialized and deterministic signed-hashing implementations;
@@ -159,7 +159,7 @@ The initial projection ensures that the first forest receives the configured rep
 
 ## Learned state and reproducibility
 
-Forest Sketch should materialize and retain all learned components during fit:
+Recursive Sketch should materialize and retain all learned components during fit:
 
 - the initial projection matrix;
 - the cloned forest fitted at each iteration;
@@ -171,7 +171,7 @@ The same state must be reused by transform. A random seed is useful for reproduc
 
 ## Comparison baselines
 
-Initial experiments should compare Forest Sketch with:
+Initial experiments should compare Recursive Sketch with:
 
 1. A downstream model trained directly on the original features.
 2. An initial random projection followed by the same downstream model.
@@ -181,7 +181,7 @@ Initial experiments should compare Forest Sketch with:
 
 Use the same train/test splits, target dimension, downstream model, and tuning budget wherever possible.
 
-The `notebooks/02_scaling_benchmarks.ipynb` notebook benchmarks wall-clock time, CPU time, and memory while scaling the number of samples and input features. The `notebooks/03_umap_representations.ipynb` notebook uses one-hot encoded Adult data to visualize the original, randomly projected, and iterative Forest Sketch representations with UMAP. The `notebooks/13_dimension_iteration_curves.ipynb` notebook overlays the accuracy-versus-dimension curves for one, two, and three iterations and adds critical-difference diagrams comparing iteration counts within each dimension. Install the notebook extras with `python -m pip install -e '.[notebook]'` before running them.
+The `notebooks/02_scaling_benchmarks.ipynb` notebook benchmarks wall-clock time, CPU time, and memory while scaling the number of samples and input features. The `notebooks/03_umap_representations.ipynb` notebook uses one-hot encoded Adult data to visualize the original, randomly projected, and iterative Recursive Sketch representations with UMAP. The `notebooks/13_dimension_iteration_curves.ipynb` notebook overlays the accuracy-versus-dimension curves for one, two, and three iterations and adds critical-difference diagrams comparing iteration counts within each dimension. Install the notebook extras with `python -m pip install -e '.[notebook]'` before running them.
 
 The hypothesis studies are split into dedicated executable notebooks:
 
@@ -195,7 +195,7 @@ The hypothesis studies are split into dedicated executable notebooks:
 - `10_q2_hypothesis_tree_path_value.ipynb` — Question 2: real tree paths versus random sparse controls.
 - `11_q5_hypothesis_sample_efficiency.ipynb` — Question 5: labeled-data fractions and noisy-test robustness.
 - `12_q6_hypothesis_cost_tradeoff.ipynb` — Question 6: predictive quality versus time, memory, and model size.
-- `15_openml_predictive_performance.ipynb` — standard random forest versus Forest Sketch with one, two, and three iterations across a controlled OpenML-CC18 subset.
+- `15_openml_predictive_performance.ipynb` — standard random forest versus Recursive Sketch with one, two, and three iterations across a controlled OpenML-CC18 subset.
 
 The shared notebook utilities also provide `make_datasets(n=4, max_size=500)` for
 deterministically selecting OpenML-CC18 tasks and stratifying larger tasks down to
@@ -203,7 +203,7 @@ at most the requested number of observations. `openml_classification_split` fits
 missing-value handling and one-hot encoding on the training partition only. The
 OpenML utilities are included in the `notebook` optional dependencies. The
 adaptive benchmark recipe uses 100 forest trees and sets `d = 20 * p`, where `p`
-is the feature width actually passed to Forest Sketch after preprocessing.
+is the feature width actually passed to Recursive Sketch after preprocessing.
 
 For multi-dataset hypothesis notebooks, `plot_critical_difference` accepts a list
 of block columns. For example, `block_column=["dataset_id", "repetition_id"]`
@@ -216,7 +216,7 @@ Each notebook prints an explicit exploratory verdict and stores its tables and p
 
 ## Versioning and releases
 
-Forest Sketch follows semantic versioning with `MAJOR.MINOR.PATCH` versions. Releases are automated from pushes to the `main` branch using Conventional Commits:
+Recursive Sketch follows semantic versioning with `MAJOR.MINOR.PATCH` versions. Releases are automated from pushes to the `main` branch using Conventional Commits:
 
 - `fix:` and maintenance commits produce a patch release, such as `0.1.1`.
 - `feat:` produces a minor release, such as `0.2.0`.

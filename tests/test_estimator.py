@@ -7,7 +7,16 @@ from sklearn.base import BaseEstimator, TransformerMixin, clone
 from sklearn.datasets import make_classification, make_regression
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
-from forestsketch import ForestSketchEstimator, SignedHashProjector, SklearnRandomProjector
+from forestsketch import (
+    ForestSketchEstimator,
+    RecursiveSketchClassifier,
+    SignedHashProjector,
+    SklearnRandomProjector,
+)
+
+
+def test_legacy_estimator_name_is_a_compatibility_alias():
+    assert ForestSketchEstimator is RecursiveSketchClassifier
 
 
 class RecordingNormalizer(BaseEstimator, TransformerMixin):
@@ -26,6 +35,17 @@ class RecordingNormalizer(BaseEstimator, TransformerMixin):
         return X
 
 
+class IdentityPathTransformer(BaseEstimator, TransformerMixin):
+    """Minimal generic path estimator used to test the transformer contract."""
+
+    def fit(self, X, y=None, sample_weight=None):
+        self.n_features_in_ = X.shape[1]
+        return self
+
+    def transform(self, X):
+        return sparse.csr_matrix(X)
+
+
 def test_classifier_transform():
     X, y = make_classification(
         n_samples=48,
@@ -38,7 +58,7 @@ def test_classifier_transform():
         max_depth=4,
         random_state=11,
     )
-    sketch = ForestSketchEstimator(
+    sketch = RecursiveSketchClassifier(
         estimator=forest,
         n_components=5,
         n_iterations=2,
@@ -57,6 +77,53 @@ def test_classifier_transform():
     assert not hasattr(forest, "estimators_")
 
 
+def test_generic_transformer_estimator_provides_path_matrix():
+    X, y = make_classification(
+        n_samples=32,
+        n_features=6,
+        n_informative=4,
+        random_state=33,
+    )
+    sketch = RecursiveSketchClassifier(
+        estimator=IdentityPathTransformer(),
+        n_components=4,
+        n_iterations=1,
+        dimension_mode="fixed",
+        output_format="sparse",
+        random_state=34,
+    )
+
+    output = sketch.fit_transform(X, y)
+
+    assert sparse.issparse(output)
+    assert output.shape == (len(X), 4)
+    assert isinstance(sketch.forests_[0], IdentityPathTransformer)
+    assert sketch.path_encoders_[0] is sketch.forests_[0]
+
+
+def test_generic_transformer_without_sample_weight_keyword_is_supported():
+    class MinimalPathTransformer(BaseEstimator, TransformerMixin):
+        def fit(self, X, y=None):
+            return self
+
+        def transform(self, X):
+            return sparse.csr_matrix(X)
+
+    X, y = make_classification(n_samples=24, n_features=5, random_state=35)
+    sketch = RecursiveSketchClassifier(
+        estimator=MinimalPathTransformer(),
+        n_components=3,
+        n_iterations=1,
+        dimension_mode="fixed",
+        output_format="sparse",
+        random_state=36,
+    )
+
+    output = sketch.fit_transform(X, y)
+
+    assert output.shape == (len(X), 3)
+
+
 def test_regressor_is_supported():
     X, y = make_regression(
         n_samples=30,
@@ -64,7 +131,7 @@ def test_regressor_is_supported():
         n_informative=4,
         random_state=2,
     )
-    sketch = ForestSketchEstimator(
+    sketch = RecursiveSketchClassifier(
         estimator=RandomForestRegressor(n_estimators=5, random_state=3),
         n_components=4,
         n_iterations=1,
@@ -84,7 +151,7 @@ def test_default_dimension_mode_sets_expanding_output_width():
         n_informative=5,
         random_state=1,
     )
-    sketch = ForestSketchEstimator(
+    sketch = RecursiveSketchClassifier(
         estimator=RandomForestClassifier(n_estimators=8, max_depth=4, random_state=11),
         n_components=5,
         n_iterations=2,
@@ -106,7 +173,7 @@ def test_dimension_ratio_resolves_width_from_input_features():
         n_informative=4,
         random_state=18,
     )
-    sketch = ForestSketchEstimator(
+    sketch = RecursiveSketchClassifier(
         estimator=RandomForestClassifier(n_estimators=4, random_state=19),
         dimension_ratio=0.5,
         n_iterations=1,
@@ -123,7 +190,7 @@ def test_dimension_ratio_resolves_width_from_input_features():
 
 def test_dimension_ratio_supports_expansion_multipliers():
     X, y = make_classification(n_samples=24, n_features=5, random_state=21)
-    sketch = ForestSketchEstimator(
+    sketch = RecursiveSketchClassifier(
         estimator=RandomForestClassifier(n_estimators=3, random_state=22),
         dimension_ratio=20,
         n_iterations=0,
@@ -139,7 +206,7 @@ def test_dimension_ratio_supports_expansion_multipliers():
 @pytest.mark.parametrize("ratio", [0, -0.5, np.nan, np.inf, True, "0.5"])
 def test_dimension_ratio_rejects_invalid_values(ratio):
     X, y = make_classification(n_samples=20, n_features=4, random_state=24)
-    sketch = ForestSketchEstimator(
+    sketch = RecursiveSketchClassifier(
         estimator=RandomForestClassifier(n_estimators=2, random_state=25),
         dimension_ratio=ratio,
     )
@@ -150,7 +217,7 @@ def test_dimension_ratio_rejects_invalid_values(ratio):
 
 def test_sample_weight_and_output_format_are_supported():
     X, y = make_classification(n_samples=30, n_features=6, random_state=12)
-    sketch = ForestSketchEstimator(
+    sketch = RecursiveSketchClassifier(
         estimator=RandomForestClassifier(n_estimators=4, random_state=13),
         n_components=4,
         n_iterations=1,
@@ -169,7 +236,7 @@ def test_sample_weight_and_output_format_are_supported():
 
 def test_expanding_mode_applies_concat_normalization():
     X, y = make_classification(n_samples=36, n_features=6, random_state=15)
-    sketch = ForestSketchEstimator(
+    sketch = RecursiveSketchClassifier(
         estimator=RandomForestClassifier(n_estimators=4, random_state=16),
         n_components=4,
         n_iterations=1,
@@ -224,7 +291,7 @@ def test_l2_normalization_returns_valid_output():
         n_informative=3,
         random_state=5,
     )
-    sketch = ForestSketchEstimator(
+    sketch = RecursiveSketchClassifier(
         estimator=RandomForestClassifier(n_estimators=4, random_state=6),
         n_components=3,
         n_iterations=1,
@@ -241,7 +308,7 @@ def test_l2_normalization_returns_valid_output():
 
 def test_stage_specific_normalizers_are_independently_cloned():
     X, y = make_classification(n_samples=32, n_features=5, random_state=21)
-    sketch = ForestSketchEstimator(
+    sketch = RecursiveSketchClassifier(
         estimator=RandomForestClassifier(n_estimators=3, random_state=22),
         n_components=3,
         n_iterations=2,
@@ -267,7 +334,7 @@ def test_stage_specific_normalizers_are_independently_cloned():
 
 def test_legacy_normalizer_is_used_for_unspecified_stages():
     X, y = make_classification(n_samples=24, n_features=4, random_state=24)
-    sketch = ForestSketchEstimator(
+    sketch = RecursiveSketchClassifier(
         estimator=RandomForestClassifier(n_estimators=2, random_state=25),
         n_components=2,
         n_iterations=1,
@@ -285,7 +352,7 @@ def test_legacy_normalizer_is_used_for_unspecified_stages():
 
 def test_fit_validation_rejects_missing_or_inconsistent_targets_and_weights():
     X, y = make_classification(n_samples=20, n_features=4, random_state=27)
-    sketch = ForestSketchEstimator(
+    sketch = RecursiveSketchClassifier(
         estimator=RandomForestClassifier(n_estimators=2, random_state=28),
         n_components=2,
         random_state=29,
@@ -309,7 +376,7 @@ def test_feature_names_are_captured_and_checked():
     )
     columns = ["height", "width", "depth"]
     X = pd.DataFrame(X, columns=columns)
-    sketch = ForestSketchEstimator(
+    sketch = RecursiveSketchClassifier(
         estimator=RandomForestClassifier(n_estimators=2, random_state=31),
         n_components=2,
         random_state=32,

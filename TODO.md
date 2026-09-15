@@ -1,6 +1,6 @@
 # TODO
 
-Prioritized follow-up work for turning the current Forest Sketch research prototype into a predictable, extensible scikit-learn component.
+Prioritized follow-up work for turning the current Recursive Sketch research prototype into a predictable, extensible scikit-learn component.
 
 ## P0 — API correctness and contracts
 
@@ -30,7 +30,7 @@ Prioritized follow-up work for turning the current Forest Sketch research protot
 - [ ] Allow cloneable projector templates or factories for the initial, path, and concatenation stages.
 - [ ] Preserve the current string-based projector shortcuts as convenient defaults.
 - [ ] Store `feature_names_in_`, `output_dimension_`, per-stage widths, and projection seeds after fitting.
-- [ ] Generate block-aware feature names such as `forestsketch_block1_0` in expanding mode.
+- [ ] Generate block-aware feature names such as `recursivesketch_block1_0` in expanding mode.
 
 ## P1 — Scalability and reliability
 

@@ -1,4 +1,4 @@
-"""Projection components used by Forest Sketch."""
+"""Projection components used by Recursive Sketch."""
 
 from numbers import Integral
 import warnings
@@ -45,7 +45,7 @@ class SklearnRandomProjector(BaseEstimator, TransformerMixin):
         )
         # d=20*p intentionally expands low-dimensional inputs. Scikit-learn
         # warns that this is not dimensionality reduction, but it is expected
-        # for Forest Sketch and should not obscure experiment output.
+        # for Recursive Sketch and should not obscure experiment output.
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=DataDimensionalityWarning)
             self._transformer.fit(X)
