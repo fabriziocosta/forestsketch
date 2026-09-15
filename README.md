@@ -205,6 +205,13 @@ OpenML utilities are included in the `notebook` optional dependencies. The
 adaptive benchmark recipe uses 100 forest trees and sets `d = 20 * p`, where `p`
 is the feature width actually passed to Recursive Sketch after preprocessing.
 
+To use the recursive-partition path estimator in notebooks 15 and 16, also
+install the sibling repository in editable mode:
+
+~~~bash
+python -m pip install -e ../RecursiveParitionClassifier
+~~~
+
 For multi-dataset hypothesis notebooks, `plot_critical_difference` accepts a list
 of block columns. For example, `block_column=["dataset_id", "repetition_id"]`
 creates one paired CD block per dataset/repetition combination. This should be

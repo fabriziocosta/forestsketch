@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import pickle
+import sys
 import time
 from dataclasses import dataclass
 from numbers import Real
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -20,6 +22,12 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 from sklearn.utils.validation import check_array, check_is_fitted
+
+# Keep notebook imports working when Jupyter starts in ``notebooks/`` rather
+# than from an installed editable package.
+repository_root = Path(__file__).resolve().parent.parent
+if str(repository_root) not in sys.path:
+    sys.path.insert(0, str(repository_root))
 
 from recursivesketch import DecisionPathEncoder, RecursiveSketchClassifier, make_projector
 
@@ -375,6 +383,45 @@ def openml_output_classifier(
     )
 
 
+def recursive_partition_classifier(seed, n_estimators=DEFAULT_N_ESTIMATORS):
+    """Construct the bootstrapped recursive-partition path estimator."""
+    try:
+        from recursive_partition import (
+            BaggedRecursivePartitionClassifier,
+            RecursivePartitionClassifier,
+        )
+    except ModuleNotFoundError:
+        search_roots = (Path.cwd(), *Path.cwd().parents)
+        sister_candidates = [
+            root / "RecursiveParitionClassifier" for root in search_roots
+        ]
+        sister_repository = next(
+            (
+                candidate
+                for candidate in sister_candidates
+                if (candidate / "recursive_partition").exists()
+            ),
+            None,
+        )
+        if sister_repository is None:
+            raise ModuleNotFoundError(
+                "Install the RecursiveParitionClassifier sister repository or "
+                "place it next to RecursiveSketch."
+            )
+        sys.path.insert(0, str(sister_repository))
+        from recursive_partition import (
+            BaggedRecursivePartitionClassifier,
+            RecursivePartitionClassifier,
+        )
+
+    return BaggedRecursivePartitionClassifier(
+        estimator=RecursivePartitionClassifier(),
+        n_estimators=n_estimators,
+        n_jobs=-1,
+        random_state=seed,
+    )
+
+
 def downstream_regressor():
     return make_pipeline(StandardScaler(), Ridge(alpha=1.0))
 
@@ -509,12 +556,21 @@ def full_sketch(
     path_projection_type="gaussian",
     concat_projection_type="sparse",
     normalization="none",
+    path_estimator="random_forest",
 ):
-    estimator = (
-        forest_classifier(seed, n_estimators=n_estimators)
-        if kind == "classifier"
-        else forest_regressor(seed, n_estimators=n_estimators)
-    )
+    if path_estimator == "random_forest":
+        estimator = (
+            forest_classifier(seed, n_estimators=n_estimators)
+            if kind == "classifier"
+            else forest_regressor(seed, n_estimators=n_estimators)
+        )
+    elif path_estimator == "recursive_partition" and kind == "classifier":
+        estimator = recursive_partition_classifier(seed, n_estimators=n_estimators)
+    else:
+        raise ValueError(
+            "path_estimator must be 'random_forest', or "
+            "'recursive_partition' for classification"
+        )
     return RecursiveSketchClassifier(
         estimator=estimator,
         n_components=n_components,

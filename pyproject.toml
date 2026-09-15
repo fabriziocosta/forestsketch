@@ -13,6 +13,7 @@ authors = [
     { name = "Recursive Sketch contributors" },
 ]
 dependencies = [
+    "joblib>=1.2",
     "numpy>=1.22",
     "scipy>=1.8",
     "scikit-learn>=1.2",
