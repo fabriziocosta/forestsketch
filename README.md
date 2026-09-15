@@ -97,8 +97,17 @@ The first implementation is expected to expose:
 | path_projection_type | Projection family for sparse forest-path features |
 | concat_projection_type | Projection family for the concatenation projection |
 | normalization | No normalization, row-wise L1 normalization, or row-wise L2 normalization |
+| input_normalizer | Optional normalizer applied before the initial projection |
+| path_normalizer | Optional normalizer applied to each sparse path matrix before path projection |
+| concat_normalizer | Optional normalizer applied to each concatenated matrix before the fixed-width projection, or before the next forest in expanding mode |
 | path_encoder | Optional replacement for the decision-path encoder |
-| normalizer | Optional replacement for the default normalization component |
+| normalizer | Legacy fallback normalizer used by stages without a stage-specific normalizer |
+
+The three stage-specific normalizer parameters are independent cloneable scikit-learn
+transformers. A stage-specific normalizer takes precedence for its stage; otherwise
+the legacy `normalizer` is cloned, and otherwise the `normalization` factory creates
+the built-in normalizer. Each fit stage and iteration receives its own clone, so no
+fitted normalizer instance is shared.
 
 The internal forest should be cloned before fitting so that ForestSketchEstimator does not mutate the estimator object supplied by the caller. Its forest hyperparameters, including tree count, depth, feature subsampling, parallelism through `n_jobs`, and forest random seed, are configured directly on estimator. The projection parameters remain ForestSketchEstimator parameters. `fit(X, y, sample_weight=...)` forwards sample weights to every cloned forest stage.
 

@@ -8,12 +8,12 @@ Prioritized follow-up work for turning the current Forest Sketch research protot
   - Fixed output width: `n_components`.
   - Expanding output width: `n_components * (n_iterations + 1)`.
   - [x] Expose the fitted width as `output_dimension_`.
-- [ ] Make normalization stage-specific with explicit `input_normalizer`, `path_normalizer`, and `concat_normalizer` components.
+- [x] Make normalization stage-specific with explicit `input_normalizer`, `path_normalizer`, and `concat_normalizer` components.
 - [x] Apply the configured concatenation normalizer before the next forest in expanding mode.
 - [x] Add `output_format="dense" | "sparse" | "auto"` and test the return type for every projector and dimension mode.
 - [x] Override `fit_transform` so the representation computed during `fit` is reused instead of transforming the training data a second time.
 - [x] Add `sample_weight=None` to `fit` and forward it to every cloned random forest.
-- [ ] Use scikit-learn validation helpers for `X`, `y`, feature names, and sample counts, with clear errors for malformed inputs.
+- [x] Use scikit-learn validation helpers for `X`, `y`, feature names, and sample counts, with clear errors for malformed inputs.
 
 ## P0 — Test coverage
 

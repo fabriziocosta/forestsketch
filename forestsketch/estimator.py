@@ -4,7 +4,12 @@ import numpy as np
 from scipy import sparse
 from sklearn.base import BaseEstimator, TransformerMixin, clone
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from sklearn.utils.validation import check_array, check_is_fitted
+from sklearn.utils.validation import (
+    check_array,
+    check_consistent_length,
+    check_is_fitted,
+    check_X_y,
+)
 
 from .normalizers import make_normalizer
 from .path_encoder import DecisionPathEncoder
@@ -28,6 +33,9 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
         path_encoder=None,
         normalizer=None,
         random_state=None,
+        input_normalizer=None,
+        path_normalizer=None,
+        concat_normalizer=None,
     ):
         self.estimator = estimator
         self.n_components = n_components
@@ -41,19 +49,21 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
         self.path_encoder = path_encoder
         self.normalizer = normalizer
         self.random_state = random_state
+        self.input_normalizer = input_normalizer
+        self.path_normalizer = path_normalizer
+        self.concat_normalizer = concat_normalizer
 
-    def fit(self, X, y, sample_weight=None):
+    def fit(self, X, y=None, sample_weight=None):
         self._fit(X, y, sample_weight=sample_weight, return_training_output=False)
         return self
 
-    def fit_transform(self, X, y, sample_weight=None, **fit_params):
+    def fit_transform(self, X, y=None, sample_weight=None, **fit_params):
         if fit_params:
             unexpected = ", ".join(sorted(fit_params))
             raise TypeError(f"Unexpected fit parameters: {unexpected}")
         return self._fit(X, y, sample_weight=sample_weight, return_training_output=True)
 
     def _fit(self, X, y, sample_weight=None, return_training_output=False):
-        X = self._validate_X(X)
         self._validate_parameters()
         self._validate_forest_estimator()
         if y is None:
@@ -61,14 +71,24 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
                 "y is required because estimator must be a fitted random-forest "
                 "classifier or regressor"
             )
-        if X.shape[0] != len(y):
-            raise ValueError("X and y have inconsistent numbers of samples")
-        if sample_weight is not None and len(sample_weight) != X.shape[0]:
-            raise ValueError("sample_weight and X have inconsistent numbers of samples")
+
+        feature_names = self._get_feature_names(X)
+        X, y = check_X_y(
+            X,
+            y,
+            accept_sparse=("csr", "csc"),
+            dtype=np.float64,
+            ensure_2d=True,
+        )
+        if sample_weight is not None:
+            check_consistent_length(X, y, sample_weight)
+        else:
+            check_consistent_length(X, y)
+        self._set_feature_names(feature_names)
 
         self.n_features_in_ = X.shape[1]
-        self.input_normalizer_ = self._make_normalizer()
-        X_for_projection = self.input_normalizer_.fit_transform(X)
+        self.input_normalizer_ = self._make_normalizer("input")
+        X_for_projection = self._fit_transform_normalizer(self.input_normalizer_, X)
 
         projection_seeds = self._projection_seeds(1 + 2 * self.n_iterations)
         self.initial_projector_ = make_projector(
@@ -98,8 +118,8 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
             encoder.fit(forest)
             V = encoder.transform(X_current)
 
-            path_normalizer = self._make_normalizer()
-            V_normalized = path_normalizer.fit_transform(V)
+            path_normalizer = self._make_normalizer("path")
+            V_normalized = self._fit_transform_normalizer(path_normalizer, V)
             path_projector = make_projector(
                 self.n_components,
                 self.path_projection_type,
@@ -110,8 +130,8 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
 
             C = _hstack(X_current, Z)
             if self.dimension_mode == "fixed":
-                concat_normalizer = self._make_normalizer()
-                C_normalized = concat_normalizer.fit_transform(C)
+                concat_normalizer = self._make_normalizer("concat")
+                C_normalized = self._fit_transform_normalizer(concat_normalizer, C)
                 concat_projector = make_projector(
                     self.n_components,
                     self.concat_projection_type,
@@ -120,8 +140,8 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
                 concat_projector.fit(C_normalized)
                 X_current = concat_projector.transform(C_normalized)
             else:
-                concat_normalizer = self._make_normalizer()
-                X_current = concat_normalizer.fit_transform(C)
+                concat_normalizer = self._make_normalizer("concat")
+                X_current = self._fit_transform_normalizer(concat_normalizer, C)
                 concat_projector = None
 
             self.forests_.append(forest)
@@ -159,10 +179,20 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
 
     def get_feature_names_out(self, input_features=None):
         check_is_fitted(self, "n_features_in_")
-        if input_features is not None and len(input_features) != self.n_features_in_:
-            raise ValueError(
-                "input_features must have the same length as the fitted input"
-            )
+        if input_features is not None:
+            input_features = np.asarray(input_features, dtype=object)
+            if input_features.ndim != 1:
+                raise ValueError("input_features must be a 1-dimensional array")
+            if input_features.shape[0] != self.n_features_in_:
+                raise ValueError(
+                    "input_features must have the same length as the fitted input"
+                )
+            if hasattr(self, "feature_names_in_") and not np.array_equal(
+                input_features, self.feature_names_in_
+            ):
+                raise ValueError(
+                    "input_features is not equal to the feature names seen during fit"
+                )
         return np.asarray(
             [f"forestsketch_{index}" for index in range(self.n_components_out_)],
             dtype=object,
@@ -178,7 +208,9 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
                 "concat_projectors_",
             ),
         )
+        feature_names = self._get_feature_names(X)
         X = self._validate_X(X)
+        self._check_feature_names(feature_names)
         if X.shape[1] != self.n_features_in_:
             raise ValueError(
                 "X has "
@@ -204,14 +236,33 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
 
         return self._format_output(X_current)
 
-    def _make_normalizer(self):
-        if self.normalizer is not None:
-            return clone(self.normalizer)
-        return make_normalizer(self.normalization)
+    def _make_normalizer(self, stage):
+        stage_normalizer = getattr(self, f"{stage}_normalizer")
+        template = stage_normalizer if stage_normalizer is not None else self.normalizer
+        if template is None:
+            return make_normalizer(self.normalization)
+        try:
+            normalizer = clone(template)
+        except Exception as exc:
+            raise TypeError(
+                f"{stage}_normalizer must be a cloneable transformer with fit "
+                "and transform methods"
+            ) from exc
+        if not hasattr(normalizer, "fit") or not hasattr(normalizer, "transform"):
+            raise TypeError(
+                f"{stage}_normalizer must provide fit and transform methods"
+            )
+        return normalizer
 
     def _projection_seeds(self, count):
         rng = np.random.RandomState(self.random_state)
         return rng.randint(0, np.iinfo(np.int32).max, size=count)
+
+    @staticmethod
+    def _fit_transform_normalizer(normalizer, X):
+        if hasattr(normalizer, "fit_transform"):
+            return normalizer.fit_transform(X)
+        return normalizer.fit(X).transform(X)
 
     def _validate_parameters(self):
         if not isinstance(self.n_components, (int, np.integer)) or self.n_components <= 0:
@@ -241,6 +292,32 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
             dtype=np.float64,
             ensure_2d=True,
         )
+
+    @staticmethod
+    def _get_feature_names(X):
+        """Return string column names from tabular input when available."""
+
+        columns = getattr(X, "columns", None)
+        if columns is None:
+            return None
+        names = np.asarray(columns, dtype=object)
+        if names.ndim != 1 or not all(isinstance(name, str) for name in names):
+            return None
+        return names
+
+    def _set_feature_names(self, feature_names):
+        if feature_names is not None:
+            self.feature_names_in_ = feature_names
+        elif hasattr(self, "feature_names_in_"):
+            del self.feature_names_in_
+
+    def _check_feature_names(self, feature_names):
+        if not hasattr(self, "feature_names_in_") or feature_names is None:
+            return
+        if not np.array_equal(feature_names, self.feature_names_in_):
+            raise ValueError(
+                "The feature names in the input do not match those seen during fit"
+            )
 
     def _format_output(self, X):
         if self.output_format == "dense" and sparse.issparse(X):

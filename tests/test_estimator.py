@@ -1,9 +1,27 @@
 import numpy as np
+import pytest
 from scipy import sparse
+from sklearn.base import BaseEstimator, TransformerMixin, clone
 from sklearn.datasets import make_classification, make_regression
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 from forestsketch import ForestSketchEstimator, SignedHashProjector
+
+
+class RecordingNormalizer(BaseEstimator, TransformerMixin):
+    """Cloneable identity normalizer used to inspect stage ownership."""
+
+    def __init__(self, label):
+        self.label = label
+
+    def fit(self, X, y=None):
+        self.n_features_in_ = X.shape[1]
+        return self
+
+    def transform(self, X):
+        if X.shape[1] != self.n_features_in_:
+            raise ValueError("unexpected feature width")
+        return X
 
 
 def test_classifier_transform():
@@ -152,3 +170,92 @@ def test_l2_normalization_returns_valid_output():
     output = sketch.transform(X[:4])
 
     assert output.shape == (4, 3)
+
+
+def test_stage_specific_normalizers_are_independently_cloned():
+    X, y = make_classification(n_samples=32, n_features=5, random_state=21)
+    sketch = ForestSketchEstimator(
+        estimator=RandomForestClassifier(n_estimators=3, random_state=22),
+        n_components=3,
+        n_iterations=2,
+        normalizer=RecordingNormalizer("legacy"),
+        input_normalizer=RecordingNormalizer("input"),
+        path_normalizer=RecordingNormalizer("path"),
+        concat_normalizer=RecordingNormalizer("concat"),
+        random_state=23,
+    )
+
+    sketch.fit(X, y)
+
+    assert sketch.input_normalizer_.label == "input"
+    assert all(normalizer.label == "path" for normalizer in sketch.path_normalizers_)
+    assert all(
+        normalizer.label == "concat" for normalizer in sketch.concat_normalizers_
+    )
+    assert sketch.input_normalizer_ is not sketch.input_normalizer
+    assert sketch.path_normalizers_[0] is not sketch.path_normalizers_[1]
+    assert sketch.concat_normalizers_[0] is not sketch.concat_normalizers_[1]
+    assert clone(sketch).get_params()["path_normalizer"].label == "path"
+
+
+def test_legacy_normalizer_is_used_for_unspecified_stages():
+    X, y = make_classification(n_samples=24, n_features=4, random_state=24)
+    sketch = ForestSketchEstimator(
+        estimator=RandomForestClassifier(n_estimators=2, random_state=25),
+        n_components=2,
+        n_iterations=1,
+        normalizer=RecordingNormalizer("legacy"),
+        path_normalizer=RecordingNormalizer("path"),
+        random_state=26,
+    )
+
+    sketch.fit(X, y)
+
+    assert sketch.input_normalizer_.label == "legacy"
+    assert sketch.path_normalizers_[0].label == "path"
+    assert sketch.concat_normalizers_[0].label == "legacy"
+
+
+def test_fit_validation_rejects_missing_or_inconsistent_targets_and_weights():
+    X, y = make_classification(n_samples=20, n_features=4, random_state=27)
+    sketch = ForestSketchEstimator(
+        estimator=RandomForestClassifier(n_estimators=2, random_state=28),
+        n_components=2,
+        random_state=29,
+    )
+
+    with pytest.raises(ValueError, match="y is required"):
+        sketch.fit(X)
+    with pytest.raises(ValueError, match="inconsistent numbers of samples"):
+        sketch.fit(X, y[:-1])
+    with pytest.raises(ValueError, match="inconsistent numbers of samples"):
+        sketch.fit(X, y, sample_weight=np.ones(X.shape[0] - 1))
+
+
+def test_feature_names_are_captured_and_checked():
+    pd = pytest.importorskip("pandas")
+    X, y = make_classification(
+        n_samples=24,
+        n_features=3,
+        n_redundant=0,
+        random_state=30,
+    )
+    columns = ["height", "width", "depth"]
+    X = pd.DataFrame(X, columns=columns)
+    sketch = ForestSketchEstimator(
+        estimator=RandomForestClassifier(n_estimators=2, random_state=31),
+        n_components=2,
+        random_state=32,
+    )
+
+    sketch.fit(X, y)
+
+    np.testing.assert_array_equal(sketch.feature_names_in_, columns)
+    np.testing.assert_array_equal(
+        sketch.get_feature_names_out(columns),
+        sketch.get_feature_names_out(),
+    )
+    with pytest.raises(ValueError, match="feature names"):
+        sketch.transform(X[columns[::-1]])
+    with pytest.raises(ValueError, match="input_features"):
+        sketch.get_feature_names_out(columns[::-1])

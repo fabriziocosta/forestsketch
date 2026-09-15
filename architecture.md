@@ -104,7 +104,7 @@ Normalization may be applied independently before each projection:
 - before Pₜᶻ, to the sparse path matrix Vₜ;
 - before Pₜᶜ, to the concatenated representation Cₜ.
 
-For experiments, expose these choices through replaceable normalizer components or stage-specific settings. The initial baseline should use no normalization, with row-wise L2 normalization as the first comparison.
+For experiments, expose these choices through replaceable normalizer components or stage-specific settings. The public `input_normalizer`, `path_normalizer`, and `concat_normalizer` parameters select each stage independently. A stage-specific component wins over the legacy `normalizer` parameter, which wins over the built-in `normalization` factory. Every stage and iteration clones its selected component before fitting so fitted state is never shared. The initial baseline should use no normalization, with row-wise L2 normalization as the first comparison.
 
 ## Iterative update
 
