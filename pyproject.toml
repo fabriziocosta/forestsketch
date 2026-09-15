@@ -28,6 +28,7 @@ notebook = [
     "openml>=0.14",
     "pandas>=1.5",
     "scikit-posthocs>=0.7",
+    "tqdm>=4.65",
     "umap-learn>=0.5",
 ]
 

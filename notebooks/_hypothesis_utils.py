@@ -18,6 +18,7 @@ from sklearn.metrics import accuracy_score, mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
 from sklearn.utils.validation import check_array, check_is_fitted
 
 from forestsketch import DecisionPathEncoder, ForestSketchEstimator, make_projector
@@ -66,6 +67,7 @@ def make_datasets(
     seed=42,
     suite_name="OpenML-CC18",
     task_ids=None,
+    dataset_names=None,
 ):
     """Load a deterministic subset of OpenML-CC18 classification datasets.
 
@@ -85,6 +87,11 @@ def make_datasets(
     task_ids:
         Optional explicit OpenML task IDs. This is useful for a fixed paper
         benchmark; ``n`` still limits the number of IDs used.
+    dataset_names:
+        Optional exact OpenML dataset names. Names are resolved within the
+        selected suite and returned in the order supplied. When provided,
+        ``n`` is ignored so that every requested name is loaded. Cannot be
+        combined with ``task_ids``.
 
     Returns
     -------
@@ -107,10 +114,40 @@ def make_datasets(
             "with `python -m pip install -e '.[notebook]'`."
         ) from exc
 
+    if task_ids is not None and dataset_names is not None:
+        raise ValueError("task_ids and dataset_names cannot be combined")
+
     suite = openml.study.get_suite(suite_name)
-    selected_task_ids = sorted(int(task_id) for task_id in (task_ids or suite.tasks))
-    if n is not None:
-        selected_task_ids = selected_task_ids[:n]
+    if dataset_names is not None:
+        if isinstance(dataset_names, str):
+            dataset_names = [dataset_names]
+        requested_names = list(dict.fromkeys(str(name) for name in dataset_names))
+        if not requested_names:
+            raise ValueError("dataset_names must contain at least one name")
+
+        task_ids_by_name = {}
+        suite_task_ids = {int(task_id) for task_id in suite.tasks}
+        for name in requested_names:
+            task_listing = openml.tasks.list_tasks(
+                data_name=name,
+                output_format="dataframe",
+            )
+            matching_tasks = task_listing[
+                task_listing["tid"].astype(int).isin(suite_task_ids)
+            ]
+            if not matching_tasks.empty:
+                task_ids_by_name[name] = int(matching_tasks.iloc[0]["tid"])
+        missing_names = [name for name in requested_names if name not in task_ids_by_name]
+        if missing_names:
+            raise ValueError(
+                "Dataset names not found in "
+                f"{suite_name}: {', '.join(missing_names)}"
+            )
+        selected_task_ids = [task_ids_by_name[name] for name in requested_names]
+    else:
+        selected_task_ids = sorted(int(task_id) for task_id in (task_ids or suite.tasks))
+        if n is not None:
+            selected_task_ids = selected_task_ids[:n]
     if not selected_task_ids:
         raise ValueError(f"OpenML suite {suite_name!r} contains no tasks")
 
@@ -307,6 +344,37 @@ def openml_downstream_classifier(seed=42):
     )
 
 
+def openml_svm_rbf_classifier(seed=42):
+    """Sparse-compatible RBF SVM with automatic feature scaling.
+
+    ``C=1`` is the fixed default SVC penalty, corresponding to the common
+    auto-regularization choice lambda=1/n_samples under the averaged-loss
+    convention. ``gamma='scale'`` derives the RBF width from the input data.
+    """
+    return make_pipeline(
+        StandardScaler(with_mean=False),
+        SVC(C=1.0, gamma="scale", kernel="rbf", random_state=seed),
+    )
+
+
+def openml_output_classifier(
+    classifier="random_forest",
+    seed=42,
+    n_estimators=DEFAULT_N_ESTIMATORS,
+):
+    """Construct a downstream classifier for an OpenML Forest Sketch output."""
+    if classifier == "logistic_regression":
+        return openml_downstream_classifier(seed)
+    if classifier == "random_forest":
+        return forest_classifier(seed, n_estimators=n_estimators)
+    if classifier == "svm_rbf_auto_lambda":
+        return openml_svm_rbf_classifier(seed)
+    raise ValueError(
+        "classifier must be one of 'logistic_regression', 'random_forest', "
+        "or 'svm_rbf_auto_lambda'"
+    )
+
+
 def downstream_regressor():
     return make_pipeline(StandardScaler(), Ridge(alpha=1.0))
 
@@ -435,6 +503,12 @@ def full_sketch(
     kind="classifier",
     n_estimators=DEFAULT_N_ESTIMATORS,
     dimension_ratio=None,
+    dimension_mode="expanding",
+    output_format="auto",
+    initial_projection_type="sparse",
+    path_projection_type="gaussian",
+    concat_projection_type="sparse",
+    normalization="none",
 ):
     estimator = (
         forest_classifier(seed, n_estimators=n_estimators)
@@ -446,6 +520,12 @@ def full_sketch(
         n_components=n_components,
         n_iterations=n_iterations,
         dimension_ratio=dimension_ratio,
+        dimension_mode=dimension_mode,
+        output_format=output_format,
+        initial_projection_type=initial_projection_type,
+        path_projection_type=path_projection_type,
+        concat_projection_type=concat_projection_type,
+        normalization=normalization,
         random_state=seed,
     )
 
