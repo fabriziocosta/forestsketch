@@ -75,7 +75,7 @@ def forest_classifier(seed, n_estimators=40):
     return RandomForestClassifier(
         n_estimators=n_estimators,
         max_depth=10,
-        n_jobs=1,
+        n_jobs=-1,
         random_state=seed,
     )
 
@@ -84,7 +84,7 @@ def forest_regressor(seed, n_estimators=40):
     return RandomForestRegressor(
         n_estimators=n_estimators,
         max_depth=10,
-        n_jobs=1,
+        n_jobs=-1,
         random_state=seed,
     )
 

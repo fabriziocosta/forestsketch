@@ -23,6 +23,7 @@ from sklearn.pipeline import make_pipeline
 forest = RandomForestClassifier(
     n_estimators=100,
     max_depth=12,
+    n_jobs=-1,
     random_state=7,
 )
 
@@ -50,6 +51,7 @@ The transformer should also support the standard scikit-learn lifecycle:
 sketch = ForestSketchEstimator(
     estimator=RandomForestClassifier(
         n_estimators=100,
+        n_jobs=-1,
         random_state=7,
     ),
     n_components=64,
