@@ -40,6 +40,7 @@ def test_classifier_transform():
         estimator=forest,
         n_components=5,
         n_iterations=2,
+        dimension_mode="fixed",
         random_state=19,
     )
 
@@ -65,6 +66,7 @@ def test_regressor_is_supported():
         estimator=RandomForestRegressor(n_estimators=5, random_state=3),
         n_components=4,
         n_iterations=1,
+        dimension_mode="fixed",
         random_state=4,
     )
 
@@ -73,7 +75,7 @@ def test_regressor_is_supported():
     assert output.shape == (30, 4)
 
 
-def test_expanding_dimension_mode_sets_output_width():
+def test_default_dimension_mode_sets_expanding_output_width():
     X, y = make_classification(
         n_samples=48,
         n_features=8,
@@ -84,7 +86,6 @@ def test_expanding_dimension_mode_sets_output_width():
         estimator=RandomForestClassifier(n_estimators=8, max_depth=4, random_state=11),
         n_components=5,
         n_iterations=2,
-        dimension_mode="expanding",
         random_state=19,
     )
 
@@ -162,6 +163,7 @@ def test_l2_normalization_returns_valid_output():
         estimator=RandomForestClassifier(n_estimators=4, random_state=6),
         n_components=3,
         n_iterations=1,
+        dimension_mode="fixed",
         normalization="l2",
         random_state=8,
     )

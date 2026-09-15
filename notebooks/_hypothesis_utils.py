@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import pickle
 import time
+from dataclasses import dataclass
+from typing import Optional
 
 import numpy as np
 from scipy import sparse
@@ -21,6 +23,201 @@ from forestsketch import DecisionPathEncoder, ForestSketchEstimator, make_projec
 
 
 CLASSIFICATION_SEEDS = (0, 1, 2)
+DEFAULT_N_ESTIMATORS = 100
+DEFAULT_DIMENSION_MULTIPLIER = 20
+
+
+def adaptive_embedding_dimension(
+    n_features,
+    multiplier=DEFAULT_DIMENSION_MULTIPLIER,
+):
+    """Return the default Forest Sketch width ``d = multiplier * p``."""
+    if not isinstance(n_features, (int, np.integer)) or n_features <= 0:
+        raise ValueError("n_features must be a positive integer")
+    if not isinstance(multiplier, (int, np.integer)) or multiplier <= 0:
+        raise ValueError("multiplier must be a positive integer")
+    return int(multiplier * n_features)
+
+
+@dataclass
+class OpenMLDataset:
+    """A reproducibly selected OpenML task and its sampled observations."""
+
+    task_id: int
+    dataset_id: int
+    name: str
+    X: object
+    y: np.ndarray
+    feature_names: tuple
+    target_name: Optional[str]
+    n_original: int
+    n_used: int
+
+
+def make_datasets(
+    n=4,
+    max_size=500,
+    seed=42,
+    suite_name="OpenML-CC18",
+    task_ids=None,
+):
+    """Load a deterministic subset of OpenML-CC18 classification datasets.
+
+    Parameters
+    ----------
+    n:
+        Maximum number of tasks to load. Tasks are selected by ascending OpenML
+        task ID unless ``task_ids`` is supplied.
+    max_size:
+        Maximum number of observations retained per dataset. Larger datasets
+        are sampled with stratification on the target. ``None`` keeps all rows.
+    seed:
+        Seed used for stratified subsampling. The same seed produces the same
+        observations for every selected task.
+    suite_name:
+        OpenML benchmark-suite alias. The default is OpenML-CC18.
+    task_ids:
+        Optional explicit OpenML task IDs. This is useful for a fixed paper
+        benchmark; ``n`` still limits the number of IDs used.
+
+    Returns
+    -------
+    list[OpenMLDataset]
+        Dataset objects containing stable identifiers, metadata, and sampled
+        feature/target arrays.
+    """
+    if n is not None and (not isinstance(n, (int, np.integer)) or n <= 0):
+        raise ValueError("n must be a positive integer or None")
+    if max_size is not None and (
+        not isinstance(max_size, (int, np.integer)) or max_size <= 0
+    ):
+        raise ValueError("max_size must be a positive integer or None")
+
+    try:
+        import openml
+    except ImportError as exc:  # pragma: no cover - depends on optional extra
+        raise ImportError(
+            "OpenML support requires the notebook dependencies; install "
+            "with `python -m pip install -e '.[notebook]'`."
+        ) from exc
+
+    suite = openml.study.get_suite(suite_name)
+    selected_task_ids = sorted(int(task_id) for task_id in (task_ids or suite.tasks))
+    if n is not None:
+        selected_task_ids = selected_task_ids[:n]
+    if not selected_task_ids:
+        raise ValueError(f"OpenML suite {suite_name!r} contains no tasks")
+
+    datasets = []
+    for task_id in selected_task_ids:
+        task = openml.tasks.get_task(task_id, download_data=True)
+        X, y = task.get_X_and_y(dataset_format="dataframe")
+        y = np.asarray(y).reshape(-1)
+        n_original = len(y)
+        if max_size is not None and n_original > max_size:
+            from sklearn.model_selection import train_test_split
+
+            selected, _ = train_test_split(
+                np.arange(n_original),
+                train_size=max_size,
+                stratify=y,
+                random_state=seed,
+            )
+            selected = np.sort(selected)
+            X = X.iloc[selected] if hasattr(X, "iloc") else X[selected]
+            y = y[selected]
+
+        dataset = task.get_dataset()
+        feature_names = tuple(
+            getattr(X, "columns", getattr(dataset, "features", []))
+        )
+        target_name = getattr(task, "target_name", None)
+        if target_name is None:
+            target_name = getattr(dataset, "default_target_attribute", None)
+        datasets.append(
+            OpenMLDataset(
+                task_id=int(task_id),
+                dataset_id=int(task.dataset_id),
+                name=str(getattr(dataset, "name", task_id)),
+                X=X,
+                y=y,
+                feature_names=feature_names,
+                target_name=target_name,
+                n_original=n_original,
+                n_used=len(y),
+            )
+        )
+    return datasets
+
+
+def openml_classification_split(dataset, test_size=0.3, seed=0):
+    """Encode one ``OpenMLDataset`` after making a stratified holdout split.
+
+    The preprocessing is fitted on the training rows only. Numeric columns
+    receive median imputation and categorical columns receive most-frequent
+    imputation followed by one-hot encoding. Numpy inputs are validated and
+    passed through as floating-point arrays.
+    """
+    from sklearn.model_selection import train_test_split
+
+    X, y = dataset.X, np.asarray(dataset.y).reshape(-1)
+    indices = np.arange(len(y))
+    train_indices, test_indices = train_test_split(
+        indices,
+        test_size=test_size,
+        stratify=y,
+        random_state=seed,
+    )
+
+    if hasattr(X, "iloc"):
+        from sklearn.compose import ColumnTransformer
+        from sklearn.impute import SimpleImputer
+        from sklearn.pipeline import make_pipeline
+        from sklearn.preprocessing import OneHotEncoder
+
+        X_train_raw = X.iloc[train_indices]
+        X_test_raw = X.iloc[test_indices]
+        categorical = list(X_train_raw.select_dtypes(include=["object", "category", "bool"]).columns)
+        numeric = [column for column in X_train_raw.columns if column not in categorical]
+        transformers = []
+        if numeric:
+            transformers.append(
+                (
+                    "numeric",
+                    SimpleImputer(strategy="median"),
+                    numeric,
+                )
+            )
+        if categorical:
+            transformers.append(
+                (
+                    "categorical",
+                    make_pipeline(
+                        SimpleImputer(strategy="most_frequent"),
+                        OneHotEncoder(handle_unknown="ignore", sparse_output=True),
+                    ),
+                    categorical,
+                )
+            )
+        preprocessor = ColumnTransformer(transformers, sparse_threshold=0.3)
+        X_train = preprocessor.fit_transform(X_train_raw)
+        X_test = preprocessor.transform(X_test_raw)
+    else:
+        from sklearn.impute import SimpleImputer
+
+        preprocessor = SimpleImputer(strategy="median")
+        X_train = preprocessor.fit_transform(X[train_indices])
+        X_test = preprocessor.transform(X[test_indices])
+        X_train = check_array(X_train, dtype=np.float64, ensure_2d=True)
+        X_test = check_array(X_test, dtype=np.float64, ensure_2d=True)
+
+    return (
+        X_train,
+        X_test,
+        y[train_indices],
+        y[test_indices],
+        preprocessor,
+    )
 
 
 def classification_data(seed=42, n_samples=2200, n_features=120):
@@ -71,7 +268,7 @@ def regression_data(seed=42, n_samples=1800, n_features=80):
     return X_train, X_val, X_test, y_train, y_val, y_test
 
 
-def forest_classifier(seed, n_estimators=100):
+def forest_classifier(seed, n_estimators=DEFAULT_N_ESTIMATORS):
     return RandomForestClassifier(
         n_estimators=n_estimators,
         max_depth=10,
@@ -80,7 +277,7 @@ def forest_classifier(seed, n_estimators=100):
     )
 
 
-def forest_regressor(seed, n_estimators=100):
+def forest_regressor(seed, n_estimators=DEFAULT_N_ESTIMATORS):
     return RandomForestRegressor(
         n_estimators=n_estimators,
         max_depth=10,
@@ -92,6 +289,14 @@ def forest_regressor(seed, n_estimators=100):
 def downstream_classifier(seed=42):
     return make_pipeline(
         StandardScaler(),
+        LogisticRegression(max_iter=3000, random_state=seed),
+    )
+
+
+def openml_downstream_classifier(seed=42):
+    """Sparse-compatible downstream classifier for encoded OpenML features."""
+    return make_pipeline(
+        StandardScaler(with_mean=False),
         LogisticRegression(max_iter=3000, random_state=seed),
     )
 
@@ -217,7 +422,13 @@ class MatchedRandomSparsePathTransformer(BaseEstimator, TransformerMixin):
         return self.projector_.transform(random_V)
 
 
-def full_sketch(seed, n_components=32, n_iterations=2, kind="classifier", n_estimators=100):
+def full_sketch(
+    seed,
+    n_components=32,
+    n_iterations=2,
+    kind="classifier",
+    n_estimators=DEFAULT_N_ESTIMATORS,
+):
     estimator = (
         forest_classifier(seed, n_estimators=n_estimators)
         if kind == "classifier"
@@ -269,10 +480,16 @@ def critical_difference_stats(
     score_column="accuracy",
     higher_is_better=True,
 ):
-    """Return paired scores, average ranks, and Nemenyi p-values for a CD plot."""
+    """Return paired scores, average ranks, and Nemenyi p-values for a CD plot.
+
+    ``block_column`` may be a string or a list of columns. Passing
+    ``["dataset_id", "repetition_id"]`` treats every dataset/repetition pair
+    as one paired block, while retaining the original single-column API.
+    """
     import scikit_posthocs as sp
 
-    wide = results.pivot(index=block_column, columns=method_column, values=score_column)
+    block_index = block_column
+    wide = results.pivot(index=block_index, columns=method_column, values=score_column)
     if wide.isna().any().any():
         raise ValueError("critical-difference input must contain every method for every block")
     average_ranks = wide.rank(

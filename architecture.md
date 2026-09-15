@@ -7,7 +7,7 @@ Forest Sketch is an iterative representation-learning architecture built from tw
 1. A random forest converts an input representation into high-dimensional sparse features that describe the nodes visited by each tree.
 2. A random projection compresses those sparse features to a user-defined dimension.
 
-The compressed tree representation is concatenated with the representation entering the current iteration. By default the concatenation is projected back to the same fixed dimension. An expanding mode can retain the concatenation, so the next representation grows by d columns per iteration.
+The compressed tree representation is concatenated with the representation entering the current iteration. By default the concatenation is retained, so the next representation grows by d columns per iteration. A fixed mode can project the concatenation back to the same dimension.
 
 ## Internal forest estimator
 
@@ -29,7 +29,7 @@ The initial component boundaries are:
 - projector: materializes or deterministically generates a projection from an input dimension to d;
 - iteration coordinator: concatenates representations and applies the stage-specific projector.
 
-The iteration coordinator exposes `dimension_mode="fixed"` and `dimension_mode="expanding"`. Fixed mode applies Pₜᶜ after every concatenation. Expanding mode skips Pₜᶜ and passes Cₜ directly to the next forest.
+The iteration coordinator exposes `dimension_mode="expanding"` by default and also supports `dimension_mode="fixed"`. Fixed mode applies Pₜᶜ after every concatenation. Expanding mode skips Pₜᶜ and passes Cₜ directly to the next forest.
 
 ForestSketchEstimator should compose these components rather than hard-code one implementation. This makes it possible to compare materialized random projections, on-the-fly signed hashing, different normalizers, and different path encoders under the same estimator interface.
 

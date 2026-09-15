@@ -24,7 +24,7 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
         estimator,
         n_components=64,
         n_iterations=1,
-        dimension_mode="fixed",
+        dimension_mode="expanding",
         output_format="auto",
         initial_projection_type="sparse",
         path_projection_type="gaussian",

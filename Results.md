@@ -19,6 +19,7 @@ This document compiles the results printed by the executed hypothesis notebooks.
 | Question 5: sample efficiency | `11_q5_hypothesis_sample_efficiency.ipynb` | Current p=120,d=2400: low-data Forest Sketch advantage 0.143; full-data mean accuracy 0.830 vs original 0.650. |
 | Question 6: quality-cost trade-off | `12_q6_hypothesis_cost_tradeoff.ipynb` | Current p=120,d=2400: Forest Sketch 0.809 vs original 0.620, with 4.267 s wall time and 1054.5 MiB peak Python memory. |
 | Dimension scaling relationship | `14_dimension_scaling_relationship.ipynb` | Exploratory 100/500-tree p/m/d study: pooled accuracy association was strongest for d/p (Spearman ρ=0.593), then d/m (0.561), then absolute d (0.478); within-block signs were positive for both ratios in all eight blocks, but thresholds varied widely. |
+| OpenML predictive performance | `15_openml_predictive_performance.ipynb` | 8 OpenML-CC18 datasets, up to 1,000 rows each, 5 repetitions, and 40 dataset×repetition blocks: T=1 minus RF +0.007 (95% CI [-0.003, 0.016]); T=2 -0.010 ([-0.021, 0.001]); T=3 -0.023 ([-0.037, -0.009]). |
 
 The summary and the current rule-of-thumb section below report the latest reruns. Earlier detailed sections are retained as historical pre-rule results and should not be read as current values.
 
@@ -42,6 +43,7 @@ The main current outcomes were:
 | 10 tree-path value | At p=120 and d=2400, one-shot path accuracy was 0.825, Forest Sketch 0.830, initial projection 0.651, and random sparse control 0.525. The tree-path hypothesis was supported descriptively. |
 | 11 sample efficiency | At p=120 and d=2400, Forest Sketch mean accuracy was 0.770 at 25% data versus original 0.627, and 0.830 versus 0.650 at full data. The low-data advantage was 0.143. |
 | 12 cost trade-off | At p=120 and d=2400, Forest Sketch accuracy was 0.809 versus original 0.620; Forest Sketch wall time was 4.267 s, peak Python memory 1054.5 MiB, and serialized state 622.1 MiB. |
+| 15 OpenML predictive performance | With 8 datasets, a maximum of 1,000 observations per dataset, 5 repetitions, 100-tree forests, and d=20p, mean accuracy across datasets was 0.868 for Random Forest, 0.875 for Forest Sketch T=1, 0.858 for T=2, and 0.846 for T=3. The T=1 gain was inconclusive; T=3 was significantly below RF in the joint-block exploratory analysis. |
 
 Critical-difference diagrams executed for the multi-configuration comparisons in notebooks 01, 04, 05, 07, 09, and 10; their ordinary mean/std or confidence-interval summaries remain the primary reporting. Notebook 08 intentionally omits a CD diagram for its single fixed dimension.
 

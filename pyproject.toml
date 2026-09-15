@@ -25,6 +25,7 @@ test = [
 notebook = [
     "jupyter>=1.0",
     "matplotlib>=3.6",
+    "openml>=0.14",
     "pandas>=1.5",
     "scikit-posthocs>=0.7",
     "umap-learn>=0.5",

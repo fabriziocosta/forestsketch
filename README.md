@@ -2,7 +2,7 @@
 
 Forest Sketch is an iterative representation-learning method that turns random-forest decision paths into compact feature vectors.
 
-For each sample, the method records the internal decision nodes and terminal leaves visited by the trees in a forest. This creates a wide sparse representation that is then compressed with a random projection. The compressed tree representation is concatenated with the current input representation and projected back to a fixed user-defined dimension. The process can be repeated for several iterations.
+For each sample, the method records the internal decision nodes and terminal leaves visited by the trees in a forest. This creates a wide sparse representation that is then compressed with a random projection. The compressed tree representation is concatenated with the current input representation; by default, the concatenation is retained and the representation expands with each iteration. A fixed-width re-projection is available as an explicit alternative. The process can be repeated for several iterations.
 
 The project is intended to provide a scikit-learn-compatible transformer named ForestSketchEstimator. The transformer accepts a configured RandomForestClassifier or RandomForestRegressor through its estimator parameter and uses that forest internally at every iteration.
 
@@ -63,7 +63,7 @@ X_train_sketch = sketch.fit_transform(X_train, y_train)
 X_test_sketch = sketch.transform(X_test)
 ~~~
 
-With the default `dimension_mode="fixed"`, both calls have shape n_samples × n_components. With `dimension_mode="expanding"`, the output has n_components × (n_iterations + 1) columns because each projected tree representation is retained.
+With the default `dimension_mode="expanding"`, the output has n_components × (n_iterations + 1) columns because each projected tree representation is retained. Set `dimension_mode="fixed"` when every iteration should be re-projected back to `n_components` columns.
 
 To retain the concatenated representation instead of projecting it back to the same width:
 
@@ -90,7 +90,7 @@ The first implementation is expected to expose:
 | estimator | Configured RandomForestClassifier or RandomForestRegressor used internally |
 | n_components | Target dimension of the compact representation |
 | n_iterations | Number of forest, path-extraction, and projection cycles |
-| dimension_mode | `fixed` projects each concatenation back to n_components; `expanding` retains each n_components tree block |
+| dimension_mode | `expanding` (default) retains each n_components tree block; `fixed` projects each concatenation back to n_components |
 | output_format | `auto` preserves the projector's native output; `dense` or `sparse` enforces the public output type |
 | random_state | Seed for projection generation; the forest seed is configured on estimator |
 | initial_projection_type | Projection family for the original input projection |
@@ -188,6 +188,21 @@ The hypothesis studies are split into dedicated executable notebooks:
 - `10_q2_hypothesis_tree_path_value.ipynb` — Question 2: real tree paths versus random sparse controls.
 - `11_q5_hypothesis_sample_efficiency.ipynb` — Question 5: labeled-data fractions and noisy-test robustness.
 - `12_q6_hypothesis_cost_tradeoff.ipynb` — Question 6: predictive quality versus time, memory, and model size.
+- `15_openml_predictive_performance.ipynb` — standard random forest versus Forest Sketch with one, two, and three iterations across a controlled OpenML-CC18 subset.
+
+The shared notebook utilities also provide `make_datasets(n=4, max_size=500)` for
+deterministically selecting OpenML-CC18 tasks and stratifying larger tasks down to
+at most the requested number of observations. `openml_classification_split` fits
+missing-value handling and one-hot encoding on the training partition only. The
+OpenML utilities are included in the `notebook` optional dependencies. The
+adaptive benchmark recipe uses 100 forest trees and sets `d = 20 * p`, where `p`
+is the feature width actually passed to Forest Sketch after preprocessing.
+
+For multi-dataset hypothesis notebooks, `plot_critical_difference` accepts a list
+of block columns. For example, `block_column=["dataset_id", "repetition_id"]`
+creates one paired CD block per dataset/repetition combination. This should be
+reported alongside per-dataset effects because repeated repetitions are nested
+within datasets and are not fully independent evidence.
 
 Each notebook prints an explicit exploratory verdict and stores its tables and plots after execution.
 
