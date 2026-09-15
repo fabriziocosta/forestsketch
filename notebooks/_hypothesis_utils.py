@@ -21,7 +21,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 from sklearn.utils.validation import check_array, check_is_fitted
 
-from forestsketch import DecisionPathEncoder, RecursiveSketchClassifier, make_projector
+from recursivesketch import DecisionPathEncoder, RecursiveSketchClassifier, make_projector
 
 
 CLASSIFICATION_SEEDS = (0, 1, 2)

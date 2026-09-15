@@ -7,7 +7,7 @@ from sklearn.base import BaseEstimator, TransformerMixin, clone
 from sklearn.datasets import make_classification, make_regression
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
-from forestsketch import (
+from recursivesketch import (
     ForestSketchEstimator,
     RecursiveSketchClassifier,
     SignedHashProjector,

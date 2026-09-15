@@ -15,7 +15,7 @@ This repository contains an initial working implementation, together with the ar
 The estimator is a transformer: it learns a compact representation and can be placed inside a scikit-learn Pipeline with a downstream classifier or regressor. The internal forest estimator and the downstream estimator are configured independently.
 
 ~~~python
-from forestsketch import RecursiveSketchClassifier
+from recursivesketch import RecursiveSketchClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import make_pipeline

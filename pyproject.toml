@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "forestsketch"
+name = "recursivesketch"
 version = "1.12.0"
 description = "Iterative path sketching for scikit-learn pipelines"
 readme = "README.md"
@@ -33,7 +33,7 @@ notebook = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["forestsketch*"]
+include = ["recursivesketch*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
