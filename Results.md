@@ -16,8 +16,7 @@ This document compiles the results printed by the executed hypothesis notebooks.
 | Question 2: tree-path value | `10_q2_hypothesis_tree_path_value.ipynb` | Supported: real tree paths outperformed the matched random sparse control. |
 | Question 5: sample efficiency | `11_q5_hypothesis_sample_efficiency.ipynb` | Not supported: the low-data Forest Sketch advantage was -0.008. |
 | Question 6: quality-cost trade-off | `12_q6_hypothesis_cost_tradeoff.ipynb` | Not supported in the tested cost envelope; accuracy was 0.016 below the original baseline. |
-| Dimension scaling relationship | `14_dimension_scaling_relationship.ipynb` | Exploratory 96-row p/m/d study: pooled accuracy association was strongest for d/p (Spearman ρ=0.582), then d/m (0.549), then absolute d (0.458); this is not evidence of a universal scaling law. |
-| Dimensionality scaling relationship | `14_dimension_scaling_relationship.ipynb` | Exploratory study: the useful scale differed across input widths and forest sizes; both $d/p$ and $d/m$ should be inspected rather than assuming one universal absolute dimension. |
+| Dimension scaling relationship | `14_dimension_scaling_relationship.ipynb` | Exploratory 100/500-tree p/m/d study: pooled accuracy association was strongest for d/p (Spearman ρ=0.593), then d/m (0.561), then absolute d (0.478); within-block signs were positive for both ratios in all eight blocks, but thresholds varied widely. |
 
 ## Preliminary question — initial projection
 
@@ -111,59 +110,51 @@ Expanding minus narrow fixed mode was +0.043, with 95% CI [0.021, 0.066]. Agains
 
 The experiments provide evidence that real tree-path features contain signal beyond a matched random sparse control. They do not yet establish that the complete iterative Forest Sketch architecture improves predictive performance over simpler baselines. In particular, later fixed-width iterations were harmful in the current study, and expanding dimensionality did not beat a width-matched fixed representation.
 
-## Dimension scaling relationship
+## Dimension scaling relationship — 100/500-tree follow-up
 
-The executed `14_dimension_scaling_relationship.ipynb` study used three controlled synthetic classification datasets with p=12, 48, and 120, the scikit-learn breast-cancer dataset with p=30, two forest sizes (16 and 64 trees), six target dimensions (8, 32, 128, 512, 2048, and 8192), and two paired seeds. It recorded p, sample count, fitted path width m, d/p, d/m, raw-forest accuracy, Forest Sketch accuracy, separate fit/transform/evaluation wall times, an output-memory proxy, serialized estimator size, and status for every configuration. All 96 configurations completed successfully in 41.9 seconds.
+The executed `14_dimension_scaling_relationship.ipynb` study used three controlled synthetic classification datasets with p=12, 48, and 120, the scikit-learn breast-cancer dataset with p=30, forests with exactly 100 and 500 trees, six target dimensions (8, 32, 128, 512, 2048, and 8192), and two paired seeds. Trees used `max_depth=8` and `n_jobs=-1`; the sweep used sparse path projection and non-materialized signed-hash concatenation. Every configuration recorded p, sample count, fitted path width m, d/p, d/m, raw-forest accuracy, Forest Sketch accuracy, separate fit/transform/evaluation wall times, an output-memory proxy, serialized estimator size, and status. All 96 configurations completed successfully in 75.4 seconds.
 
-The planning pass showed that raw fitted path width increased with forest size: for the synthetic datasets it was about 1.5–1.6k columns with 16 trees and 6.3–6.4k with 64 trees; the breast-cancer reference ranged from 466 to 1,790 columns. A dense Gaussian path matrix at d=8192 and 64 trees was estimated near 397–399 MiB for the synthetic datasets, while the sparse projection estimate was about 5 MiB. The executed sweep therefore used sparse path projections and a non-materialized signed-hash concatenation projection.
+The planning pass showed the expected growth in raw fitted path width. For the synthetic datasets, the planning m was about 9.9–10.1k columns with 100 trees and 49.8–49.9k with 500 trees; the breast-cancer reference ranged from 2,818 to 14,088 columns. At d=8192 and 500 trees, a dense Gaussian path matrix was estimated at about 3.1 GiB for the synthetic datasets and 880.5 MiB for breast cancer, while the sparse estimates were about 14 MiB and 7.4 MiB respectively. The sparse implementation made the requested full grid tractable; these are planning estimates, not peak-RSS measurements.
 
-Across all successful rows, Spearman correlation with accuracy was 0.458 for log(d), 0.582 for log(d/p), and 0.549 for log(d/m). The normalized d/p association was strongest in this pooled descriptive check, but both ratios are correlated with absolute d and the factor grid changes the fitted forest, so this does not identify a causal or universal rule. The best observed configurations varied: the breast-cancer reference was near or above its raw-forest accuracy by d=2048–8192, while the p=120 synthetic variants still favored d=8192. Runtime and output storage rose sharply with d (the mean p=120, 64-tree d=8192 output proxy was about 50 MiB).
-
-This is exploratory evidence, not a proof. Limitations include classification only, one downstream learner, shallow bounded forests, two seeds, and reading held-out test curves across a factor grid. The next experiment should pre-register a validation-based d-selection rule, test it on additional held-out datasets and task types, and then revisit the other hypothesis notebooks.
-
-## Exploratory dimensionality scaling
-
-Notebook 14 ran a 96-row full grid over three controlled synthetic classification widths ($p=12, 48, 120$), the scikit-learn breast-cancer dataset ($p=30$), forests with 16 or 64 trees, projected widths $d \in \{8, 32, 128, 512, 2048, 8192\}$, and two paired seeds. Trees were capped at depth 8 and fitted fully in parallel. The study used sparse path projection and signed-hash concatenation so the 8192-dimensional stress point remained tractable; the uncompressed path width $m$ was measured from each fitted forest.
-
-All 96 configurations completed successfully in 41.2 seconds. Across the full grid, Spearman correlations between accuracy and log-width were 0.458 for absolute $d$, 0.582 for $d/p$, and 0.549 for $d/m$. The best configuration for each dataset/forest pair was:
+Across all successful rows, pooled Spearman correlations between accuracy and log-width were 0.478 for absolute d, 0.593 for d/p, and 0.561 for d/m. The best observed configuration in each dataset/forest block was:
 
 | Dataset | Trees | Best d | Mean m | Mean sketch accuracy | Mean raw-RF accuracy |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Breast cancer ($p=30$) | 16 | 2048 | 342 | 0.965 | 0.942 |
-| Breast cancer ($p=30$) | 64 | 8192 | 1272 | 0.959 | 0.942 |
-| Synthetic ($p=12$) | 16 | 2048 | 842 | 0.896 | 0.896 |
-| Synthetic ($p=12$) | 64 | 512 | 3872 | 0.904 | 0.900 |
-| Synthetic ($p=120$) | 16 | 8192 | 1276 | 0.804 | 0.715 |
-| Synthetic ($p=120$) | 64 | 8192 | 5072 | 0.844 | 0.774 |
-
-The result does not support a single universal choice based only on $p$, $m$, or an absolute 8k rule. It does support examining both normalized widths—especially $d/p$ and $d/m$—alongside accuracy and cost. The notebook’s real-data reference is encouraging, but the study remains exploratory: it uses classification, one downstream learner, bounded forest settings, and test-set comparisons. Larger real datasets and validation-based dimension selection are still needed before changing the other hypothesis notebooks.
+| Breast cancer (p=30) | 100 | 2048 | 2112 | 0.965 | 0.947 |
+| Breast cancer (p=30) | 500 | 128 | 13510 | 0.971 | 0.947 |
+| Synthetic (p=12) | 100 | 8192 | 4894 | 0.904 | 0.907 |
+| Synthetic (p=12) | 500 | 512 | 30304 | 0.904 | 0.900 |
+| Synthetic (p=120) | 100 | 8192 | 8012 | 0.856 | 0.759 |
+| Synthetic (p=120) | 500 | 8192 | 40008 | 0.859 | 0.815 |
+| Synthetic (p=48) | 100 | 8192 | 6958 | 0.889 | 0.867 |
+| Synthetic (p=48) | 500 | 8192 | 34946 | 0.907 | 0.856 |
 
 ### Within-block analysis
 
-The follow-up analysis reran the full notebook and then removed the pooled factor mixing by analyzing each dataset × forest-size block separately. Each block contains 12 rows (six dimensions × two seeds). Spearman correlations of the accuracy gap to the raw forest were positive for both ratios in all eight blocks:
+The grouped analysis removes the pooled factor mixing by analyzing each dataset × forest-size block separately. Each block contains 12 rows (six dimensions × two seeds). The accuracy-gap correlations were positive for both ratios in all eight blocks:
 
 | Dataset | Trees | ρ(log(d/p)) | ρ(log(d/m)) | Mean gap |
 | --- | ---: | ---: | ---: | ---: |
-| Breast cancer ($p=30$) | 16 | 0.838 | 0.794 | -0.013 |
-| Breast cancer ($p=30$) | 64 | 0.598 | 0.500 | -0.006 |
-| Synthetic ($p=12$) | 16 | 0.844 | 0.884 | -0.055 |
-| Synthetic ($p=12$) | 64 | 0.789 | 0.851 | -0.066 |
-| Synthetic ($p=120$) | 16 | 0.943 | 0.944 | -0.001 |
-| Synthetic ($p=120$) | 64 | 0.961 | 0.937 | -0.045 |
-| Synthetic ($p=48$) | 16 | 0.928 | 0.939 | -0.050 |
-| Synthetic ($p=48$) | 64 | 0.920 | 0.914 | -0.048 |
+| Breast cancer (p=30) | 100 | 0.607 | 0.505 | -0.006 |
+| Breast cancer (p=30) | 500 | 0.557 | 0.484 | -0.008 |
+| Synthetic (p=12) | 100 | 0.800 | 0.841 | -0.061 |
+| Synthetic (p=12) | 500 | 0.738 | 0.807 | -0.062 |
+| Synthetic (p=120) | 100 | 0.975 | 0.972 | -0.032 |
+| Synthetic (p=120) | 500 | 0.947 | 0.979 | -0.058 |
+| Synthetic (p=48) | 100 | 0.954 | 0.923 | -0.052 |
+| Synthetic (p=48) | 500 | 0.975 | 0.958 | -0.049 |
 
 The smallest observed ratios whose block-mean gap was at least -0.02 were:
 
 | Dataset | Trees | Minimum d/p (d) | Minimum d/m (d) |
 | --- | ---: | ---: | ---: |
-| Breast cancer ($p=30$) | 16 | 4.267 (128) | 0.307 (128) |
-| Breast cancer ($p=30$) | 64 | 1.067 (32) | 0.015 (32) |
-| Synthetic ($p=12$) | 16 | 170.667 (2048) | 2.078 (2048) |
-| Synthetic ($p=12$) | 64 | 682.667 (8192) | 2.240 (8192) |
-| Synthetic ($p=120$) | 16 | 1.067 (128) | 0.080 (128) |
-| Synthetic ($p=120$) | 64 | 4.267 (512) | 0.085 (512) |
-| Synthetic ($p=48$) | 16 | 42.667 (2048) | 1.662 (2048) |
-| Synthetic ($p=48$) | 64 | 42.667 (2048) | 0.415 (2048) |
+| Breast cancer (p=30) | 100 | 1.067 (32) | 0.010 (32) |
+| Breast cancer (p=30) | 500 | 4.267 (128) | 0.010 (128) |
+| Synthetic (p=12) | 100 | 170.667 (2048) | 0.325 (2048) |
+| Synthetic (p=12) | 500 | 42.667 (512) | 0.015 (512) |
+| Synthetic (p=120) | 100 | 4.267 (512) | 0.055 (512) |
+| Synthetic (p=120) | 500 | 4.267 (512) | 0.011 (512) |
+| Synthetic (p=48) | 100 | 42.667 (2048) | 0.266 (2048) |
+| Synthetic (p=48) | 500 | 42.667 (2048) | 0.053 (2048) |
 
-Thus the apparent `d/p` relationship survives as consistent descriptive within-block evidence in this grid, but it does not yield a stable threshold across blocks; `d/m` is also consistently increasing. The rerun completed all 96 configurations successfully in 48.4 seconds. Limitations remain two seeds, controlled datasets, one downstream learner, bounded forests, and exploratory use of held-out test results.
+Thus the apparent d/p relationship survives as consistent descriptive within-block evidence in this grid, but its threshold varies from 1.067 to 682.667 and does not define a stable universal rule. d/m is also consistently increasing, with thresholds from 0.010 to 0.325. Limitations remain two seeds, controlled datasets, one downstream learner, bounded tree depth, and exploratory use of held-out test results. Larger real datasets and validation-based dimension selection are needed before changing the other hypothesis notebooks.
