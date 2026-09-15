@@ -5,6 +5,7 @@ from __future__ import annotations
 import pickle
 import time
 from dataclasses import dataclass
+from numbers import Real
 from typing import Optional
 
 import numpy as np
@@ -24,19 +25,24 @@ from forestsketch import DecisionPathEncoder, ForestSketchEstimator, make_projec
 
 CLASSIFICATION_SEEDS = (0, 1, 2)
 DEFAULT_N_ESTIMATORS = 100
-DEFAULT_DIMENSION_MULTIPLIER = 20
+DEFAULT_DIMENSION_RATIO = 20
 
 
 def adaptive_embedding_dimension(
     n_features,
-    multiplier=DEFAULT_DIMENSION_MULTIPLIER,
+    dimension_ratio=DEFAULT_DIMENSION_RATIO,
 ):
-    """Return the default Forest Sketch width ``d = multiplier * p``."""
+    """Return ``ceil(dimension_ratio * p)`` for a positive ratio."""
     if not isinstance(n_features, (int, np.integer)) or n_features <= 0:
         raise ValueError("n_features must be a positive integer")
-    if not isinstance(multiplier, (int, np.integer)) or multiplier <= 0:
-        raise ValueError("multiplier must be a positive integer")
-    return int(multiplier * n_features)
+    if (
+        isinstance(dimension_ratio, (bool, np.bool_))
+        or not isinstance(dimension_ratio, Real)
+        or not np.isfinite(dimension_ratio)
+        or dimension_ratio <= 0
+    ):
+        raise ValueError("dimension_ratio must be a positive finite number")
+    return max(1, int(np.ceil(dimension_ratio * n_features)))
 
 
 @dataclass
@@ -428,6 +434,7 @@ def full_sketch(
     n_iterations=2,
     kind="classifier",
     n_estimators=DEFAULT_N_ESTIMATORS,
+    dimension_ratio=None,
 ):
     estimator = (
         forest_classifier(seed, n_estimators=n_estimators)
@@ -438,6 +445,7 @@ def full_sketch(
         estimator=estimator,
         n_components=n_components,
         n_iterations=n_iterations,
+        dimension_ratio=dimension_ratio,
         random_state=seed,
     )
 

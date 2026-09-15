@@ -31,6 +31,11 @@ The initial component boundaries are:
 
 The iteration coordinator exposes `dimension_mode="expanding"` by default and also supports `dimension_mode="fixed"`. Fixed mode applies Pₜᶜ after every concatenation. Expanding mode skips Pₜᶜ and passes Cₜ directly to the next forest.
 
+The configured projection width may be data-adaptive: when `dimension_ratio`
+is provided, the estimator resolves `n_components_ = ceil(dimension_ratio × p)`
+at fit time, where `p` is the number of input features. The existing absolute
+`n_components` behavior is retained when the ratio is omitted.
+
 ForestSketchEstimator should compose these components rather than hard-code one implementation. This makes it possible to compare materialized random projections, on-the-fly signed hashing, different normalizers, and different path encoders under the same estimator interface.
 
 ## Notation

@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import pytest
 from scipy import sparse
@@ -5,7 +7,7 @@ from sklearn.base import BaseEstimator, TransformerMixin, clone
 from sklearn.datasets import make_classification, make_regression
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
-from forestsketch import ForestSketchEstimator, SignedHashProjector
+from forestsketch import ForestSketchEstimator, SignedHashProjector, SklearnRandomProjector
 
 
 class RecordingNormalizer(BaseEstimator, TransformerMixin):
@@ -97,6 +99,55 @@ def test_default_dimension_mode_sets_expanding_output_width():
     assert sketch.output_dimension_ == 15
 
 
+def test_dimension_ratio_resolves_width_from_input_features():
+    X, y = make_classification(
+        n_samples=30,
+        n_features=6,
+        n_informative=4,
+        random_state=18,
+    )
+    sketch = ForestSketchEstimator(
+        estimator=RandomForestClassifier(n_estimators=4, random_state=19),
+        dimension_ratio=0.5,
+        n_iterations=1,
+        dimension_mode="fixed",
+        random_state=20,
+    )
+
+    output = sketch.fit_transform(X, y)
+
+    assert sketch.n_components_ == 3
+    assert output.shape == (30, 3)
+    assert sketch.initial_projector_.n_components == 3
+
+
+def test_dimension_ratio_supports_expansion_multipliers():
+    X, y = make_classification(n_samples=24, n_features=5, random_state=21)
+    sketch = ForestSketchEstimator(
+        estimator=RandomForestClassifier(n_estimators=3, random_state=22),
+        dimension_ratio=20,
+        n_iterations=0,
+        random_state=23,
+    )
+
+    output = sketch.fit_transform(X, y)
+
+    assert sketch.n_components_ == 100
+    assert output.shape == (24, 100)
+
+
+@pytest.mark.parametrize("ratio", [0, -0.5, np.nan, np.inf, True, "0.5"])
+def test_dimension_ratio_rejects_invalid_values(ratio):
+    X, y = make_classification(n_samples=20, n_features=4, random_state=24)
+    sketch = ForestSketchEstimator(
+        estimator=RandomForestClassifier(n_estimators=2, random_state=25),
+        dimension_ratio=ratio,
+    )
+
+    with pytest.raises(ValueError, match="dimension_ratio"):
+        sketch.fit(X, y)
+
+
 def test_sample_weight_and_output_format_are_supported():
     X, y = make_classification(n_samples=30, n_features=6, random_state=12)
     sketch = ForestSketchEstimator(
@@ -150,6 +201,20 @@ def test_signed_hash_projector_is_deterministic_and_sparse():
 
     assert sparse.issparse(first_output)
     np.testing.assert_allclose(first_output.toarray(), second_output.toarray())
+
+
+def test_sklearn_projector_suppresses_expected_dimensionality_warning():
+    X = np.ones((6, 4))
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        SklearnRandomProjector(n_components=20, random_state=7).fit(X)
+
+    assert not any(
+        issubclass(warning.category, UserWarning)
+        and "number of components is higher than the number of features" in str(warning.message)
+        for warning in caught
+    )
 
 
 def test_l2_normalization_returns_valid_output():

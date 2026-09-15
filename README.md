@@ -65,6 +65,12 @@ X_test_sketch = sketch.transform(X_test)
 
 With the default `dimension_mode="expanding"`, the output has n_components × (n_iterations + 1) columns because each projected tree representation is retained. Set `dimension_mode="fixed"` when every iteration should be re-projected back to `n_components` columns.
 
+For a width that adapts to the encoded input, use `dimension_ratio`: `0.5` gives
+`ceil(0.5 * p)` components and `20` gives `20 * p` components. The resolved
+width is available as `n_components_` after fitting. When `dimension_ratio` is
+`None` (the default), `n_components` remains an absolute width for backwards
+compatibility.
+
 To retain the concatenated representation instead of projecting it back to the same width:
 
 ~~~python
@@ -89,6 +95,7 @@ The first implementation is expected to expose:
 | --- | --- |
 | estimator | Configured RandomForestClassifier or RandomForestRegressor used internally |
 | n_components | Target dimension of the compact representation |
+| dimension_ratio | Optional positive ratio used to compute `ceil(dimension_ratio × p)` at fit time; takes precedence over `n_components` |
 | n_iterations | Number of forest, path-extraction, and projection cycles |
 | dimension_mode | `expanding` (default) retains each n_components tree block; `fixed` projects each concatenation back to n_components |
 | output_format | `auto` preserves the projector's native output; `dense` or `sparse` enforces the public output type |

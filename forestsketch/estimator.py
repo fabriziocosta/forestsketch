@@ -1,5 +1,7 @@
 """The public Forest Sketch transformer."""
 
+from numbers import Real
+
 import numpy as np
 from scipy import sparse
 from sklearn.base import BaseEstimator, TransformerMixin, clone
@@ -36,6 +38,7 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
         input_normalizer=None,
         path_normalizer=None,
         concat_normalizer=None,
+        dimension_ratio=None,
     ):
         self.estimator = estimator
         self.n_components = n_components
@@ -52,6 +55,7 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
         self.input_normalizer = input_normalizer
         self.path_normalizer = path_normalizer
         self.concat_normalizer = concat_normalizer
+        self.dimension_ratio = dimension_ratio
 
     def fit(self, X, y=None, sample_weight=None):
         self._fit(X, y, sample_weight=sample_weight, return_training_output=False)
@@ -87,12 +91,13 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
         self._set_feature_names(feature_names)
 
         self.n_features_in_ = X.shape[1]
+        self.n_components_ = self._resolve_n_components(self.n_features_in_)
         self.input_normalizer_ = self._make_normalizer("input")
         X_for_projection = self._fit_transform_normalizer(self.input_normalizer_, X)
 
         projection_seeds = self._projection_seeds(1 + 2 * self.n_iterations)
         self.initial_projector_ = make_projector(
-            self.n_components,
+            self.n_components_,
             self.initial_projection_type,
             projection_seeds[0],
         )
@@ -121,7 +126,7 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
             path_normalizer = self._make_normalizer("path")
             V_normalized = self._fit_transform_normalizer(path_normalizer, V)
             path_projector = make_projector(
-                self.n_components,
+                self.n_components_,
                 self.path_projection_type,
                 projection_seeds[1 + 2 * iteration],
             )
@@ -133,7 +138,7 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
                 concat_normalizer = self._make_normalizer("concat")
                 C_normalized = self._fit_transform_normalizer(concat_normalizer, C)
                 concat_projector = make_projector(
-                    self.n_components,
+                    self.n_components_,
                     self.concat_projection_type,
                     projection_seeds[2 + 2 * iteration],
                 )
@@ -152,9 +157,9 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
             self.concat_projectors_.append(concat_projector)
 
         self.n_components_out_ = (
-            self.n_components
+            self.n_components_
             if self.dimension_mode == "fixed"
-            else self.n_components * (self.n_iterations + 1)
+            else self.n_components_ * (self.n_iterations + 1)
         )
         self.output_dimension_ = self.n_components_out_
         self.projection_matrices_ = {
@@ -267,12 +272,26 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
     def _validate_parameters(self):
         if not isinstance(self.n_components, (int, np.integer)) or self.n_components <= 0:
             raise ValueError("n_components must be a positive integer")
+        if self.dimension_ratio is not None and (
+            isinstance(self.dimension_ratio, (bool, np.bool_))
+            or not isinstance(self.dimension_ratio, Real)
+            or not np.isfinite(self.dimension_ratio)
+            or self.dimension_ratio <= 0
+        ):
+            raise ValueError("dimension_ratio must be a positive finite number or None")
         if not isinstance(self.n_iterations, (int, np.integer)) or self.n_iterations < 0:
             raise ValueError("n_iterations must be a non-negative integer")
         if self.dimension_mode not in {"fixed", "expanding"}:
             raise ValueError("dimension_mode must be 'fixed' or 'expanding'")
         if self.output_format not in {"auto", "dense", "sparse"}:
             raise ValueError("output_format must be 'auto', 'dense', or 'sparse'")
+
+    def _resolve_n_components(self, n_features):
+        """Resolve the fitted projection width from the input feature width."""
+
+        if self.dimension_ratio is None:
+            return int(self.n_components)
+        return max(1, int(np.ceil(self.dimension_ratio * n_features)))
 
     def _validate_forest_estimator(self):
         if not isinstance(

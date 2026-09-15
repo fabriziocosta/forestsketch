@@ -1,10 +1,12 @@
 """Projection components used by Forest Sketch."""
 
 from numbers import Integral
+import warnings
 
 import numpy as np
 from scipy import sparse
 from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.exceptions import DataDimensionalityWarning
 from sklearn.random_projection import GaussianRandomProjection, SparseRandomProjection
 from sklearn.utils import check_random_state
 from sklearn.utils.validation import check_array, check_is_fitted
@@ -41,7 +43,12 @@ class SklearnRandomProjector(BaseEstimator, TransformerMixin):
             n_components=self.n_components,
             random_state=self.random_state,
         )
-        self._transformer.fit(X)
+        # d=20*p intentionally expands low-dimensional inputs. Scikit-learn
+        # warns that this is not dimensionality reduction, but it is expected
+        # for Forest Sketch and should not obscure experiment output.
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=DataDimensionalityWarning)
+            self._transformer.fit(X)
         self.n_features_in_ = X.shape[1]
         self.components_ = self._transformer.components_
         return self

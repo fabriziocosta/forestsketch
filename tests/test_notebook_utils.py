@@ -15,7 +15,7 @@ _SPEC.loader.exec_module(_MODULE)
 
 def test_adaptive_embedding_dimension_uses_twenty_times_input_width_by_default():
     assert _MODULE.adaptive_embedding_dimension(7) == 140
-    assert _MODULE.adaptive_embedding_dimension(np.int64(7), multiplier=3) == 21
+    assert _MODULE.adaptive_embedding_dimension(np.int64(7), dimension_ratio=3) == 21
 
 
 def test_openml_numeric_split_imputes_missing_values_from_training_rows():
