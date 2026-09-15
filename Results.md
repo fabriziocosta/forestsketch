@@ -1,6 +1,6 @@
 # Experimental results
 
-This document compiles the results printed by the executed hypothesis notebooks. These are exploratory studies, not final benchmark claims. Unless noted otherwise, accuracy is held-out classification accuracy and errors are integer misclassification counts.
+This document compiles the results printed by the executed hypothesis notebooks. These are exploratory studies, not final benchmark claims. Unless noted otherwise, accuracy is held-out classification accuracy and errors are integer misclassification counts. The notebooks retain their mean and standard-deviation summaries and, where at least three configurations are compared across paired seeds, also provide critical-difference diagrams based on average ranks and Nemenyi post-hoc significance testing.
 
 ## Summary
 

@@ -258,3 +258,59 @@ def regression_scores(model, X_train, y_train, X_test, y_test):
 def print_verdict(name, supported, evidence):
     label = "SUPPORTED" if supported else "NOT SUPPORTED"
     print(f"{name}: {label} — {evidence}")
+
+
+def critical_difference_stats(
+    results,
+    block_column,
+    method_column,
+    score_column="accuracy",
+    higher_is_better=True,
+):
+    """Return paired scores, average ranks, and Nemenyi p-values for a CD plot."""
+    import scikit_posthocs as sp
+
+    wide = results.pivot(index=block_column, columns=method_column, values=score_column)
+    if wide.isna().any().any():
+        raise ValueError("critical-difference input must contain every method for every block")
+    average_ranks = wide.rank(
+        axis=1,
+        ascending=not higher_is_better,
+        method="average",
+    ).mean()
+    significance = sp.posthoc_nemenyi_friedman(wide)
+    return wide, average_ranks, significance
+
+
+def plot_critical_difference(
+    results,
+    block_column,
+    method_column,
+    score_column="accuracy",
+    higher_is_better=True,
+    ax=None,
+    title=None,
+):
+    """Plot a critical-difference diagram from paired experiment results."""
+    import matplotlib.pyplot as plt
+    import scikit_posthocs as sp
+
+    if ax is None:
+        _, ax = plt.subplots(figsize=(8, 4))
+    _, average_ranks, significance = critical_difference_stats(
+        results,
+        block_column=block_column,
+        method_column=method_column,
+        score_column=score_column,
+        higher_is_better=higher_is_better,
+    )
+    sp.critical_difference_diagram(
+        average_ranks.to_dict(),
+        significance,
+        alpha=0.05,
+        ax=ax,
+        left_only=True,
+    )
+    if title is not None:
+        ax.set_title(title)
+    return ax
