@@ -142,19 +142,9 @@ Xₜ
 
 The next forest operates on Xₜ₊₁. After T iterations, the final representation is the current X representation at t = T. In fixed mode, Xₜ has d columns for every t. In expanding mode, Xₜ has (t + 1)d columns and Cₜ has (t + 2)d columns.
 
-## Intermediate representations
+## Public representation
 
-The API should expose intermediate representations for inspection and diagnostics, but capture should be opt-in because Vₜ can be extremely wide and sparse.
-
-The standard transform method should return only the final representation Xₜ. A separate method such as transform_with_intermediates should return the final representation together with a per-iteration trace containing:
-
-- Xₜ, the forest input;
-- Vₜ, the sparse visited-node representation;
-- Zₜ, the projected tree representation;
-- Cₜ, the concatenated representation;
-- Xₜ₊₁, the next forest input.
-
-This keeps ForestSketchEstimator compatible with ordinary scikit-learn Pipeline behavior while making the internal computation available for experiments and debugging.
+The public API returns only the final representation through the standard `transform` and `fit_transform` methods. The intermediate matrices Xₜ, Vₜ, Zₜ, and Cₜ are implementation details; keeping them private avoids retaining extremely wide sparse matrices and keeps the estimator small and predictable inside scikit-learn pipelines.
 
 ## End-to-end algorithm
 

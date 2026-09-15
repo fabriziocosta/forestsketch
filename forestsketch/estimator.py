@@ -20,6 +20,7 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
         n_components=64,
         n_iterations=1,
         dimension_mode="fixed",
+        output_format="auto",
         initial_projection_type="sparse",
         path_projection_type="gaussian",
         concat_projection_type="sparse",
@@ -32,6 +33,7 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
         self.n_components = n_components
         self.n_iterations = n_iterations
         self.dimension_mode = dimension_mode
+        self.output_format = output_format
         self.initial_projection_type = initial_projection_type
         self.path_projection_type = path_projection_type
         self.concat_projection_type = concat_projection_type
@@ -40,7 +42,17 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
         self.normalizer = normalizer
         self.random_state = random_state
 
-    def fit(self, X, y):
+    def fit(self, X, y, sample_weight=None):
+        self._fit(X, y, sample_weight=sample_weight, return_training_output=False)
+        return self
+
+    def fit_transform(self, X, y, sample_weight=None, **fit_params):
+        if fit_params:
+            unexpected = ", ".join(sorted(fit_params))
+            raise TypeError(f"Unexpected fit parameters: {unexpected}")
+        return self._fit(X, y, sample_weight=sample_weight, return_training_output=True)
+
+    def _fit(self, X, y, sample_weight=None, return_training_output=False):
         X = self._validate_X(X)
         self._validate_parameters()
         self._validate_forest_estimator()
@@ -51,6 +63,8 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
             )
         if X.shape[0] != len(y):
             raise ValueError("X and y have inconsistent numbers of samples")
+        if sample_weight is not None and len(sample_weight) != X.shape[0]:
+            raise ValueError("sample_weight and X have inconsistent numbers of samples")
 
         self.n_features_in_ = X.shape[1]
         self.input_normalizer_ = self._make_normalizer()
@@ -74,7 +88,7 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
 
         for iteration in range(self.n_iterations):
             forest = clone(self.estimator)
-            forest.fit(X_current, y)
+            forest.fit(X_current, y, sample_weight=sample_weight)
 
             encoder = (
                 clone(self.path_encoder)
@@ -106,9 +120,9 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
                 concat_projector.fit(C_normalized)
                 X_current = concat_projector.transform(C_normalized)
             else:
-                concat_normalizer = None
+                concat_normalizer = self._make_normalizer()
+                X_current = concat_normalizer.fit_transform(C)
                 concat_projector = None
-                X_current = C
 
             self.forests_.append(forest)
             self.path_encoders_.append(encoder)
@@ -122,6 +136,7 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
             if self.dimension_mode == "fixed"
             else self.n_components * (self.n_iterations + 1)
         )
+        self.output_dimension_ = self.n_components_out_
         self.projection_matrices_ = {
             "P0": getattr(self.initial_projector_, "components_", None),
             "PZ": [
@@ -135,16 +150,12 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
                 for projector in self.concat_projectors_
             ],
         }
-        return self
+        if return_training_output:
+            return self._format_output(X_current)
+        return None
 
     def transform(self, X):
-        X_current, _ = self._transform(X, return_intermediates=False)
-        return X_current
-
-    def transform_with_intermediates(self, X):
-        """Return the final representation and a per-iteration diagnostic trace."""
-
-        return self._transform(X, return_intermediates=True)
+        return self._transform(X)
 
     def get_feature_names_out(self, input_features=None):
         check_is_fitted(self, "n_features_in_")
@@ -157,7 +168,7 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
             dtype=object,
         )
 
-    def _transform(self, X, return_intermediates):
+    def _transform(self, X):
         check_is_fitted(
             self,
             (
@@ -177,7 +188,6 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
 
         X_for_projection = self.input_normalizer_.transform(X)
         X_current = self.initial_projector_.transform(X_for_projection)
-        trace = []
 
         for iteration, encoder in enumerate(self.path_encoders_):
             V = encoder.transform(X_current)
@@ -188,21 +198,11 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
                 C_normalized = self.concat_normalizers_[iteration].transform(C)
                 X_next = self.concat_projectors_[iteration].transform(C_normalized)
             else:
-                X_next = C
+                X_next = self.concat_normalizers_[iteration].transform(C)
 
-            if return_intermediates:
-                trace.append(
-                    {
-                        "X": X_current,
-                        "V": V,
-                        "Z": Z,
-                        "C": C,
-                        "X_next": X_next,
-                    }
-                )
             X_current = X_next
 
-        return X_current, trace
+        return self._format_output(X_current)
 
     def _make_normalizer(self):
         if self.normalizer is not None:
@@ -220,6 +220,8 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
             raise ValueError("n_iterations must be a non-negative integer")
         if self.dimension_mode not in {"fixed", "expanding"}:
             raise ValueError("dimension_mode must be 'fixed' or 'expanding'")
+        if self.output_format not in {"auto", "dense", "sparse"}:
+            raise ValueError("output_format must be 'auto', 'dense', or 'sparse'")
 
     def _validate_forest_estimator(self):
         if not isinstance(
@@ -239,6 +241,13 @@ class ForestSketchEstimator(BaseEstimator, TransformerMixin):
             dtype=np.float64,
             ensure_2d=True,
         )
+
+    def _format_output(self, X):
+        if self.output_format == "dense" and sparse.issparse(X):
+            return X.toarray()
+        if self.output_format == "sparse" and not sparse.issparse(X):
+            return sparse.csr_matrix(X)
+        return X
 
 
 def _hstack(left, right):

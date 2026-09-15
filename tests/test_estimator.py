@@ -6,7 +6,7 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from forestsketch import ForestSketchEstimator, SignedHashProjector
 
 
-def test_classifier_transform_and_intermediates():
+def test_classifier_transform():
     X, y = make_classification(
         n_samples=48,
         n_features=8,
@@ -27,17 +27,9 @@ def test_classifier_transform_and_intermediates():
 
     output = sketch.fit_transform(X, y)
     transformed = sketch.transform(X[:7])
-    final, trace = sketch.transform_with_intermediates(X[:7])
 
     assert output.shape == (48, 5)
     assert transformed.shape == (7, 5)
-    np.testing.assert_allclose(transformed, final)
-    assert len(trace) == 2
-    assert sparse.issparse(trace[0]["V"])
-    assert trace[0]["V"].shape[0] == 7
-    assert trace[0]["Z"].shape == (7, 5)
-    assert trace[0]["C"].shape == (7, 10)
-    assert trace[0]["X_next"].shape == (7, 5)
     assert sketch.projection_matrices_["P0"].shape == (5, 8)
     assert sketch.projection_matrices_["PZ"][0].shape[0] == 5
     assert sketch.projection_matrices_["PC"][0].shape == (5, 10)
@@ -63,7 +55,7 @@ def test_regressor_is_supported():
     assert output.shape == (30, 4)
 
 
-def test_expanding_dimension_mode_retains_each_tree_representation():
+def test_expanding_dimension_mode_sets_output_width():
     X, y = make_classification(
         n_samples=48,
         n_features=8,
@@ -79,14 +71,49 @@ def test_expanding_dimension_mode_retains_each_tree_representation():
     )
 
     output = sketch.fit_transform(X, y)
-    final, trace = sketch.transform_with_intermediates(X[:7])
 
     assert output.shape == (48, 15)
-    assert final.shape == (7, 15)
-    assert [item["C"].shape[1] for item in trace] == [10, 15]
-    assert [item["X_next"].shape[1] for item in trace] == [10, 15]
     assert sketch.projection_matrices_["PC"] == [None, None]
     assert len(sketch.get_feature_names_out()) == 15
+    assert sketch.output_dimension_ == 15
+
+
+def test_sample_weight_and_output_format_are_supported():
+    X, y = make_classification(n_samples=30, n_features=6, random_state=12)
+    sketch = ForestSketchEstimator(
+        estimator=RandomForestClassifier(n_estimators=4, random_state=13),
+        n_components=4,
+        n_iterations=1,
+        output_format="sparse",
+        random_state=14,
+    )
+
+    output = sketch.fit_transform(X, y, sample_weight=np.ones(X.shape[0]))
+
+    assert sparse.issparse(output)
+    transformed = sketch.transform(X)
+    assert sparse.issparse(transformed)
+    np.testing.assert_allclose(output.toarray(), transformed.toarray())
+    assert not hasattr(sketch, "_training_output_")
+
+
+def test_expanding_mode_applies_concat_normalization():
+    X, y = make_classification(n_samples=36, n_features=6, random_state=15)
+    sketch = ForestSketchEstimator(
+        estimator=RandomForestClassifier(n_estimators=4, random_state=16),
+        n_components=4,
+        n_iterations=1,
+        dimension_mode="expanding",
+        normalization="l2",
+        random_state=17,
+    )
+
+    sketch.fit(X, y)
+    output = sketch.transform(X[:5])
+    norms = np.sqrt(np.asarray(output ** 2).sum(axis=1))
+
+    assert np.allclose(norms, 1.0)
+    assert sketch.concat_normalizers_[0] is not None
 
 
 def test_signed_hash_projector_is_deterministic_and_sparse():
@@ -106,7 +133,7 @@ def test_signed_hash_projector_is_deterministic_and_sparse():
     np.testing.assert_allclose(first_output.toarray(), second_output.toarray())
 
 
-def test_l2_normalization_preserves_sparse_path_structure():
+def test_l2_normalization_returns_valid_output():
     X, y = make_classification(
         n_samples=24,
         n_features=5,
@@ -122,8 +149,6 @@ def test_l2_normalization_preserves_sparse_path_structure():
     )
 
     sketch.fit(X, y)
-    _, trace = sketch.transform_with_intermediates(X[:4])
-    row_norms = np.sqrt(np.asarray(trace[0]["V"].multiply(trace[0]["V"]).sum(axis=1)).ravel())
+    output = sketch.transform(X[:4])
 
-    assert sparse.issparse(trace[0]["V"])
-    assert np.all(row_norms > 0)
+    assert output.shape == (4, 3)

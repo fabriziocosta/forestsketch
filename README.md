@@ -79,19 +79,7 @@ X_expanded = expanding_sketch.fit_transform(X_train, y_train)
 # X_expanded.shape == (n_samples, 32 * (3 + 1))
 ~~~
 
-For experiments and diagnostics, the estimator should provide an opt-in method that returns the final representation and the per-iteration trace:
-
-~~~python
-X_test_sketch, trace = sketch.transform_with_intermediates(X_test)
-
-first_iteration = trace[0]
-V_0 = first_iteration["V"]
-Z_0 = first_iteration["Z"]
-C_0 = first_iteration["C"]
-X_1 = first_iteration["X_next"]
-~~~
-
-The standard transform method should not retain these intermediate values by default, because the sparse visited-node matrices can be very large.
+The estimator exposes only the final representation through the standard `transform` and `fit_transform` methods. Intermediate path and concatenated matrices remain internal because the visited-node matrices can be extremely wide and sparse.
 
 ## Initial API
 
@@ -103,6 +91,7 @@ The first implementation is expected to expose:
 | n_components | Target dimension of the compact representation |
 | n_iterations | Number of forest, path-extraction, and projection cycles |
 | dimension_mode | `fixed` projects each concatenation back to n_components; `expanding` retains each n_components tree block |
+| output_format | `auto` preserves the projector's native output; `dense` or `sparse` enforces the public output type |
 | random_state | Seed for projection generation; the forest seed is configured on estimator |
 | initial_projection_type | Projection family for the original input projection |
 | path_projection_type | Projection family for sparse forest-path features |
@@ -111,7 +100,9 @@ The first implementation is expected to expose:
 | path_encoder | Optional replacement for the decision-path encoder |
 | normalizer | Optional replacement for the default normalization component |
 
-The internal forest should be cloned before fitting so that ForestSketchEstimator does not mutate the estimator object supplied by the caller. Its forest hyperparameters, including tree count, depth, feature subsampling, and forest random seed, are configured directly on estimator. The projection parameters remain ForestSketchEstimator parameters.
+The internal forest should be cloned before fitting so that ForestSketchEstimator does not mutate the estimator object supplied by the caller. Its forest hyperparameters, including tree count, depth, feature subsampling, parallelism through `n_jobs`, and forest random seed, are configured directly on estimator. The projection parameters remain ForestSketchEstimator parameters. `fit(X, y, sample_weight=...)` forwards sample weights to every cloned forest stage.
+
+`fit_transform` reuses the representation computed during fitting. This avoids refitting forests or recomputing the training path representation merely to return the training output.
 
 The exact parameter names may be refined to follow scikit-learn conventions, but the estimator should support BaseEstimator and TransformerMixin behavior.
 
@@ -174,22 +165,22 @@ Initial experiments should compare Forest Sketch with:
 
 Use the same train/test splits, target dimension, downstream model, and tuning budget wherever possible.
 
-The `notebooks/02_scaling_benchmarks.ipynb` notebook benchmarks wall-clock time, CPU time, and memory while scaling the number of samples and input features. The `notebooks/11_umap_representations.ipynb` notebook uses one-hot encoded Adult data to visualize the original, randomly projected, and iterative Forest Sketch representations with UMAP. Install the notebook extras with `python -m pip install -e '.[notebook]'` before running them.
+The `notebooks/02_scaling_benchmarks.ipynb` notebook benchmarks wall-clock time, CPU time, and memory while scaling the number of samples and input features. The `notebooks/03_umap_representations.ipynb` notebook uses one-hot encoded Adult data to visualize the original, randomly projected, and iterative Forest Sketch representations with UMAP. Install the notebook extras with `python -m pip install -e '.[notebook]'` before running them.
 
 The hypothesis studies are split into dedicated executable notebooks:
 
-- `03_hypothesis_initial_projection.ipynb` — initial projection and forest performance.
-- `04_hypothesis_predictive_performance.ipynb` — classification and regression performance.
-- `05_hypothesis_tree_path_value.ipynb` — real tree paths versus random sparse controls.
-- `06_hypothesis_iteration.ipynb` — performance and cost as iteration count changes.
-- `07_hypothesis_concatenation.ipynb` — concatenation versus replacement updates.
-- `08_hypothesis_sample_efficiency.ipynb` — labeled-data fractions and noisy-test robustness.
-- `09_hypothesis_cost_tradeoff.ipynb` — predictive quality versus time, memory, and model size.
-- `10_hypothesis_target_dimension.ipynb` — accuracy and storage across target dimensions.
+- `04_q7_hypothesis_target_dimension.ipynb` — Question 7: accuracy and storage across target dimensions.
+- `05_q8_hypothesis_expanding_dimension.ipynb` — Question 8: expanding versus fixed dimensionality.
+- `06_q4_hypothesis_concatenation.ipynb` — Question 4: concatenation versus replacement updates.
+- `07_q3_hypothesis_iteration.ipynb` — Question 3: performance and cost as iteration count changes.
+- `08_preliminary_hypothesis_initial_projection.ipynb` — preliminary initial-projection check.
+- `09_q1_hypothesis_predictive_performance.ipynb` — Question 1: classification and regression performance.
+- `10_q2_hypothesis_tree_path_value.ipynb` — Question 2: real tree paths versus random sparse controls.
+- `11_q5_hypothesis_sample_efficiency.ipynb` — Question 5: labeled-data fractions and noisy-test robustness.
+- `12_q6_hypothesis_cost_tradeoff.ipynb` — Question 6: predictive quality versus time, memory, and model size.
 
 Each notebook prints an explicit exploratory verdict and stores its tables and plots after execution.
 
-- `12_hypothesis_expanding_dimension.ipynb` — expanding versus fixed dimensionality.
 
 ## Versioning and releases
 
@@ -212,3 +203,4 @@ fix: preserve sparse path features during normalization
 
 - architecture.md describes the representation flow, matrix dimensions, and scikit-learn integration.
 - Hypothesis.md lists the scientific questions, baselines, ablations, and falsification criteria.
+- Results.md compiles the results produced by the executed hypothesis notebooks.
