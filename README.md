@@ -164,7 +164,7 @@ Forest Sketch follows semantic versioning with `MAJOR.MINOR.PATCH` versions. Rel
 - `feat:` produces a minor release, such as `0.2.0`.
 - A breaking change, marked with `!` or a `BREAKING CHANGE:` footer, produces a major release, such as `1.0.0`.
 
-The release workflow updates the version in `pyproject.toml`, generates the changelog, creates a Git tag, and publishes a GitHub Release. The initial public baseline is version `0.1.0`. PyPI publishing is intentionally not enabled yet; the GitHub repository and its release artifacts are the current distribution target.
+The release workflow updates the version in `pyproject.toml`, generates the changelog, creates a Git tag, and publishes a GitHub Release. The first automated public release is version `1.0.0`; the source baseline is also retained as tag `v0.1.0`. PyPI publishing is intentionally not enabled yet; the GitHub repository and its release artifacts are the current distribution target.
 
 When contributing, use a Conventional Commit message, for example:
 
