@@ -71,7 +71,7 @@ def regression_data(seed=42, n_samples=1800, n_features=80):
     return X_train, X_val, X_test, y_train, y_val, y_test
 
 
-def forest_classifier(seed, n_estimators=40):
+def forest_classifier(seed, n_estimators=100):
     return RandomForestClassifier(
         n_estimators=n_estimators,
         max_depth=10,
@@ -80,7 +80,7 @@ def forest_classifier(seed, n_estimators=40):
     )
 
 
-def forest_regressor(seed, n_estimators=40):
+def forest_regressor(seed, n_estimators=100):
     return RandomForestRegressor(
         n_estimators=n_estimators,
         max_depth=10,
@@ -217,9 +217,11 @@ class MatchedRandomSparsePathTransformer(BaseEstimator, TransformerMixin):
         return self.projector_.transform(random_V)
 
 
-def full_sketch(seed, n_components=32, n_iterations=2, kind="classifier"):
+def full_sketch(seed, n_components=32, n_iterations=2, kind="classifier", n_estimators=100):
     estimator = (
-        forest_classifier(seed) if kind == "classifier" else forest_regressor(seed)
+        forest_classifier(seed, n_estimators=n_estimators)
+        if kind == "classifier"
+        else forest_regressor(seed, n_estimators=n_estimators)
     )
     return ForestSketchEstimator(
         estimator=estimator,

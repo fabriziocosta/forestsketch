@@ -6,17 +6,48 @@ This document compiles the results printed by the executed hypothesis notebooks.
 
 | Study | Notebook | Result |
 | --- | --- | --- |
-| UMAP representation | `03_umap_representations.ipynb` | Visualization study; not a numbered hypothesis. |
-| Question 7: target dimension | `04_q7_hypothesis_target_dimension.ipynb` | A useful plateau was reached by d=2048; the fitted power-law asymptote was 0.962. |
-| Question 8: expanding dimensionality | `05_q8_hypothesis_expanding_dimension.ipynb` | Inconclusive: expansion beat narrow fixed mode by 0.043, but lost 0.008 against the width-matched fixed control. |
-| Question 4: concatenation | `06_q4_hypothesis_concatenation.ipynb` | Technically supported by a 0.001 gain, but the practical effect was negligible. |
-| Question 3: iteration | `07_q3_hypothesis_iteration.ipynb` | Not supported: T=2 was worse than T=1 by 0.023, with 95% CI [-0.037, -0.010]. |
-| Preliminary initial projection | `08_preliminary_hypothesis_initial_projection.ipynb` | Not supported under the predefined 0.05 accuracy-loss tolerance; the largest observed loss was 0.055. |
-| Question 1: predictive performance | `09_q1_hypothesis_predictive_performance.ipynb` | Not supported in the tested classification and regression runs. |
-| Question 2: tree-path value | `10_q2_hypothesis_tree_path_value.ipynb` | Supported: real tree paths outperformed the matched random sparse control. |
-| Question 5: sample efficiency | `11_q5_hypothesis_sample_efficiency.ipynb` | Not supported: the low-data Forest Sketch advantage was -0.008. |
-| Question 6: quality-cost trade-off | `12_q6_hypothesis_cost_tradeoff.ipynb` | Not supported in the tested cost envelope; accuracy was 0.016 below the original baseline. |
+| Baseline comparison | `01_compare_baselines.ipynb` | Current p=120, d=2400, 100-tree run: one-shot path 0.856 ± 0.018; Forest Sketch 0.844 ± 0.025; original 0.706 ± 0.054. |
+| Scaling benchmarks | `02_scaling_benchmarks.ipynb` | Current 100-tree run computes d=20p: d=320–2560 across p=16–128; wall time 0.708–1.727 s and peak RSS 948–1503 MiB in the feature sweep. |
+| UMAP representation | `03_umap_representations.ipynb` | Special 2D UMAP design retained; 100-tree run completed and generated 7 embeddings. |
+| Question 7: target dimension | `04_q7_hypothesis_target_dimension.ipynb` | Sweep retained with 100 trees; raw RF 0.841, sketch 0.845 at d=2048 and 0.847 at d=8192; plateau threshold d=2048. |
+| Question 8: expanding dimensionality | `05_q8_hypothesis_expanding_dimension.ipynb` | Current p=60, block d=1200: inconclusive; expanding 0.869 ± 0.017 vs fixed 0.860 ± 0.021 and width-matched fixed 0.876 ± 0.012. |
+| Question 4: concatenation | `06_q4_hypothesis_concatenation.ipynb` | Current p=120, d=2400: concatenation 0.830 ± 0.029 vs replacement 0.782 ± 0.042; gain 0.048. |
+| Question 3: iteration | `07_q3_hypothesis_iteration.ipynb` | Current p=120, d=2400: T=2 was below T=1 by 0.012, 95% CI [-0.018, -0.007]. |
+| Preliminary initial projection | `08_preliminary_hypothesis_initial_projection.ipynb` | Current p=120, d=2400: maximum observed loss 0.000; predefined tolerance 0.05 was met. |
+| Question 1: predictive performance | `09_q1_hypothesis_predictive_performance.ipynb` | Current classification p=120,d=2400: Forest Sketch 0.830 vs original 0.650; regression p=80,d=1600: R² 0.439 vs original 0.993. |
+| Question 2: tree-path value | `10_q2_hypothesis_tree_path_value.ipynb` | Current p=120,d=2400: one-shot path 0.825, Forest Sketch 0.830, random sparse control 0.525. |
+| Question 5: sample efficiency | `11_q5_hypothesis_sample_efficiency.ipynb` | Current p=120,d=2400: low-data Forest Sketch advantage 0.143; full-data mean accuracy 0.830 vs original 0.650. |
+| Question 6: quality-cost trade-off | `12_q6_hypothesis_cost_tradeoff.ipynb` | Current p=120,d=2400: Forest Sketch 0.809 vs original 0.620, with 4.267 s wall time and 1054.5 MiB peak Python memory. |
 | Dimension scaling relationship | `14_dimension_scaling_relationship.ipynb` | Exploratory 100/500-tree p/m/d study: pooled accuracy association was strongest for d/p (Spearman ρ=0.593), then d/m (0.561), then absolute d (0.478); within-block signs were positive for both ratios in all eight blocks, but thresholds varied widely. |
+
+The summary and the current rule-of-thumb section below report the latest reruns. Earlier detailed sections are retained as historical pre-rule results and should not be read as current values.
+
+## Current rule-of-thumb rerun
+
+The fixed-width rule was applied with an internal `RandomForestClassifier`/`RandomForestRegressor` using 100 trees, `n_jobs=-1`, and `d=20*p` computed from the actual dataset width. The fixed dimensions were p=120 → d=2400 in notebooks 01, 06, 07, 08, 10, 11, and 12; p=60 → d=1200 in notebook 05; and p=120 → d=2400 for classification versus p=80 → d=1600 for regression in notebook 09. Notebook 02 computed d dynamically as 20 times each swept feature count (320–2560 in the feature sweep).
+
+The main current outcomes were:
+
+| Notebook | Current result |
+| --- | --- |
+| 01 baseline comparison | Across 10 seeds, one-shot tree-path accuracy was 0.856 ± 0.018, full Forest Sketch 0.844 ± 0.025, iterative without concatenation 0.829 ± 0.028, original 0.706 ± 0.054, and matched random sparse control 0.508 ± 0.024. The baseline critical-difference diagram executed successfully. |
+| 02 scaling | With 100 trees and dynamic d=20p, sample-sweep wall time rose from 0.708 s at 256 samples to 1.392 s at 2048; feature-sweep wall time rose from 0.711 s at p=16 to 1.727 s at p=128. Feature-sweep peak RSS ranged from 948 to 1503 MiB. |
+| 03 UMAP | The special 2D visualization remained intact; 100-tree execution generated 7 embeddings for 630 visualization rows. 1-NN UMAP accuracy ranged from 0.698 to 0.779 across representations. |
+| 04 target-dimension sweep | The sweep remained intact with p=120 and 100 trees. Raw RF accuracy was 0.841; Forest Sketch mean accuracy rose from 0.586 at d=8 to 0.845 at d=2048 and 0.847 at d=8192. The fitted asymptote was 0.938 and the smallest dimension within 0.02 of the best was 2048. |
+| 05 expanding dimension | At p=60 and block d=1200, fixed accuracy was 0.860 ± 0.021, expanding 0.869 ± 0.017, and width-matched fixed 0.876 ± 0.012 (95% CI half-widths 0.0147, 0.0121, and 0.0080). The paired verdict remained inconclusive: expanding minus fixed 0.009, CI [0.001, 0.017]; versus width-matched fixed -0.007, CI [-0.021, 0.007]. |
+| 06 concatenation | At p=120 and d=2400, concatenation scored 0.830 ± 0.029 versus 0.782 ± 0.042 without concatenation, a gain of 0.048. |
+| 07 iteration | At p=120 and d=2400, mean accuracies for T=0/1/2/3 were 0.686/0.857/0.845/0.834; T=2 minus T=1 was -0.012 with 95% CI [-0.018, -0.007]. Total experiment time was 143.9 s. |
+| 08 initial projection | At p=120 and d=2400, projected accuracy was 0.816 and 0.834 across the two seeds versus direct accuracy 0.786 and 0.834; mean loss was -0.015 and maximum loss 0.000. The fixed-rule check met the 0.05 tolerance; no CD diagram was used because only one dimension was tested. |
+| 09 predictive performance | Classification p=120,d=2400: Forest Sketch 0.830 ± 0.029, one-shot path 0.825 ± 0.016, original 0.650 ± 0.042. Regression p=80,d=1600: Forest Sketch R²=0.439, RMSE=164.268 versus original R²=0.993, RMSE=18.208. Classification was supported; regression was not. |
+| 10 tree-path value | At p=120 and d=2400, one-shot path accuracy was 0.825, Forest Sketch 0.830, initial projection 0.651, and random sparse control 0.525. The tree-path hypothesis was supported descriptively. |
+| 11 sample efficiency | At p=120 and d=2400, Forest Sketch mean accuracy was 0.770 at 25% data versus original 0.627, and 0.830 versus 0.650 at full data. The low-data advantage was 0.143. |
+| 12 cost trade-off | At p=120 and d=2400, Forest Sketch accuracy was 0.809 versus original 0.620; Forest Sketch wall time was 4.267 s, peak Python memory 1054.5 MiB, and serialized state 622.1 MiB. |
+
+Critical-difference diagrams executed for the multi-configuration comparisons in notebooks 01, 04, 05, 07, 09, and 10; their ordinary mean/std or confidence-interval summaries remain the primary reporting. Notebook 08 intentionally omits a CD diagram for its single fixed dimension.
+
+Notebook 13 was not checked as a current rerun. Its 100-tree full curve attempt was stopped after several minutes, and a resource-appropriate 40-tree retry was also stopped before clean completion because the Gaussian 8192-dimensional curve remained too expensive. No stopped 13 run contributes current numerical claims here; its prior curve outputs are historical. Notebook 14 remains the current 100/500-tree multi-factor p/m/d reference and was not collapsed to d=20p.
+
+All successful current notebook results remain exploratory: they use controlled datasets, small seed counts in several studies, one downstream learner in most comparisons, and held-out test results during hypothesis exploration. The d=20p rule is a documented initial rule of thumb, not a validated universal selection method.
 
 ## Preliminary question — initial projection
 
