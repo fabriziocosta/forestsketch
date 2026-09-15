@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "recursivesketch"
-version = "1.12.0"
+version = "1.13.0"
 description = "Iterative path sketching for scikit-learn pipelines"
 readme = "README.md"
 requires-python = ">=3.9"
