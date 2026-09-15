@@ -46,6 +46,7 @@ Prioritized follow-up work for turning the current Forest Sketch research protot
 - [x] Report the raw forest accuracy and the uncompressed visited-node width beside every relevant compressed result.
 - [ ] Separate wall-clock time, CPU time, peak memory, output width, and serialized model size in experiment reports.
 - [ ] Keep the final test set untouched while selecting `n_components`, `n_iterations`, and dimension mode.
+- [x] Run a paired multi-dataset study of target dimension `d` versus input width `p` and fitted path width `m` before changing the other hypothesis notebooks.
 - [ ] Add experiments across multiple datasets and task types before making performance claims.
 
 ## P2 — Packaging and documentation

@@ -178,6 +178,7 @@ The `notebooks/02_scaling_benchmarks.ipynb` notebook benchmarks wall-clock time,
 
 The hypothesis studies are split into dedicated executable notebooks:
 
+- `14_dimension_scaling_relationship.ipynb` — exploratory relationship between original width `p`, fitted path width `m`, and target dimension `d`.
 - `04_q7_hypothesis_target_dimension.ipynb` — Question 7: accuracy and storage across target dimensions.
 - `05_q8_hypothesis_expanding_dimension.ipynb` — Question 8: expanding versus fixed dimensionality.
 - `06_q4_hypothesis_concatenation.ipynb` — Question 4: concatenation versus replacement updates.

@@ -16,6 +16,7 @@ This document compiles the results printed by the executed hypothesis notebooks.
 | Question 2: tree-path value | `10_q2_hypothesis_tree_path_value.ipynb` | Supported: real tree paths outperformed the matched random sparse control. |
 | Question 5: sample efficiency | `11_q5_hypothesis_sample_efficiency.ipynb` | Not supported: the low-data Forest Sketch advantage was -0.008. |
 | Question 6: quality-cost trade-off | `12_q6_hypothesis_cost_tradeoff.ipynb` | Not supported in the tested cost envelope; accuracy was 0.016 below the original baseline. |
+| Dimension scaling relationship | `14_dimension_scaling_relationship.ipynb` | Exploratory 96-row p/m/d study: pooled accuracy association was strongest for d/p (Spearman ρ=0.582), then d/m (0.549), then absolute d (0.458); this is not evidence of a universal scaling law. |
 | Dimensionality scaling relationship | `14_dimension_scaling_relationship.ipynb` | Exploratory study: the useful scale differed across input widths and forest sizes; both $d/p$ and $d/m$ should be inspected rather than assuming one universal absolute dimension. |
 
 ## Preliminary question — initial projection
@@ -110,8 +111,29 @@ Expanding minus narrow fixed mode was +0.043, with 95% CI [0.021, 0.066]. Agains
 
 The experiments provide evidence that real tree-path features contain signal beyond a matched random sparse control. They do not yet establish that the complete iterative Forest Sketch architecture improves predictive performance over simpler baselines. In particular, later fixed-width iterations were harmful in the current study, and expanding dimensionality did not beat a width-matched fixed representation.
 
+## Dimension scaling relationship
+
+The executed `14_dimension_scaling_relationship.ipynb` study used three controlled synthetic classification datasets with p=12, 48, and 120, the scikit-learn breast-cancer dataset with p=30, two forest sizes (16 and 64 trees), six target dimensions (8, 32, 128, 512, 2048, and 8192), and two paired seeds. It recorded p, sample count, fitted path width m, d/p, d/m, raw-forest accuracy, Forest Sketch accuracy, separate fit/transform/evaluation wall times, an output-memory proxy, serialized estimator size, and status for every configuration. All 96 configurations completed successfully in 41.9 seconds.
+
+The planning pass showed that raw fitted path width increased with forest size: for the synthetic datasets it was about 1.5–1.6k columns with 16 trees and 6.3–6.4k with 64 trees; the breast-cancer reference ranged from 466 to 1,790 columns. A dense Gaussian path matrix at d=8192 and 64 trees was estimated near 397–399 MiB for the synthetic datasets, while the sparse projection estimate was about 5 MiB. The executed sweep therefore used sparse path projections and a non-materialized signed-hash concatenation projection.
+
+Across all successful rows, Spearman correlation with accuracy was 0.458 for log(d), 0.582 for log(d/p), and 0.549 for log(d/m). The normalized d/p association was strongest in this pooled descriptive check, but both ratios are correlated with absolute d and the factor grid changes the fitted forest, so this does not identify a causal or universal rule. The best observed configurations varied: the breast-cancer reference was near or above its raw-forest accuracy by d=2048–8192, while the p=120 synthetic variants still favored d=8192. Runtime and output storage rose sharply with d (the mean p=120, 64-tree d=8192 output proxy was about 50 MiB).
+
+This is exploratory evidence, not a proof. Limitations include classification only, one downstream learner, shallow bounded forests, two seeds, and reading held-out test curves across a factor grid. The next experiment should pre-register a validation-based d-selection rule, test it on additional held-out datasets and task types, and then revisit the other hypothesis notebooks.
+
 ## Exploratory dimensionality scaling
 
-Notebook 14 varied controlled classification problems with $p \in \{16, 64, 128\}$, forests with 8 or 32 trees, and projected widths $d \in \{256, 2048, 8192\}$. It used 900 samples, maximum tree depth 5, two paired seeds, and fully parallel random forests. The uncompressed path width $m$ was measured from the fitted forest rather than inferred from $p$.
+Notebook 14 ran a 96-row full grid over three controlled synthetic classification widths ($p=12, 48, 120$), the scikit-learn breast-cancer dataset ($p=30$), forests with 16 or 64 trees, projected widths $d \in \{8, 32, 128, 512, 2048, 8192\}$, and two paired seeds. Trees were capped at depth 8 and fitted fully in parallel. The study used sparse path projection and signed-hash concatenation so the 8192-dimensional stress point remained tractable; the uncompressed path width $m$ was measured from each fitted forest.
 
-The best observed mean sketch accuracy was 0.883 for $p=16$, 32 trees, and $d=2048$; the corresponding raw-forest mean was 0.857. For $p=64$ and 32 trees, the best observed sketch mean was 0.794 at $d=2048$, versus a raw-forest mean of 0.710. For $p=128$ and 32 trees, the best observed sketch mean was 0.754 at $d=8192$, versus a raw-forest mean of 0.698. These results do not support a single universal rule based only on $p$ or only on $m$: the notebook reports $d/p$, $d/m$, path width, runtime, and serialized model size so the relationship can be studied directly. The experiment is exploratory and should be repeated on real datasets and with larger forests before changing the other hypothesis notebooks.
+All 96 configurations completed successfully in 41.2 seconds. Across the full grid, Spearman correlations between accuracy and log-width were 0.458 for absolute $d$, 0.582 for $d/p$, and 0.549 for $d/m$. The best configuration for each dataset/forest pair was:
+
+| Dataset | Trees | Best d | Mean m | Mean sketch accuracy | Mean raw-RF accuracy |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Breast cancer ($p=30$) | 16 | 2048 | 342 | 0.965 | 0.942 |
+| Breast cancer ($p=30$) | 64 | 8192 | 1272 | 0.959 | 0.942 |
+| Synthetic ($p=12$) | 16 | 2048 | 842 | 0.896 | 0.896 |
+| Synthetic ($p=12$) | 64 | 512 | 3872 | 0.904 | 0.900 |
+| Synthetic ($p=120$) | 16 | 8192 | 1276 | 0.804 | 0.715 |
+| Synthetic ($p=120$) | 64 | 8192 | 5072 | 0.844 | 0.774 |
+
+The result does not support a single universal choice based only on $p$, $m$, or an absolute 8k rule. It does support examining both normalized widths—especially $d/p$ and $d/m$—alongside accuracy and cost. The notebook’s real-data reference is encouraging, but the study remains exploratory: it uses classification, one downstream learner, bounded forest settings, and test-set comparisons. Larger real datasets and validation-based dimension selection are still needed before changing the other hypothesis notebooks.
