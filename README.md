@@ -156,7 +156,20 @@ Initial experiments should compare Forest Sketch with:
 
 Use the same train/test splits, target dimension, downstream model, and tuning budget wherever possible.
 
-The `notebooks/02_scaling_benchmarks.ipynb` notebook benchmarks wall-clock time, CPU time, and memory while scaling the number of samples and input features. Install the notebook extras with `python -m pip install -e '.[notebook]'` before running it.
+The `notebooks/02_scaling_benchmarks.ipynb` notebook benchmarks wall-clock time, CPU time, and memory while scaling the number of samples and input features. The `notebooks/11_umap_representations.ipynb` notebook uses one-hot encoded Adult data to visualize the original, randomly projected, and iterative Forest Sketch representations with UMAP. Install the notebook extras with `python -m pip install -e '.[notebook]'` before running them.
+
+The hypothesis studies are split into dedicated executable notebooks:
+
+- `03_hypothesis_initial_projection.ipynb` — initial projection and forest performance.
+- `04_hypothesis_predictive_performance.ipynb` — classification and regression performance.
+- `05_hypothesis_tree_path_value.ipynb` — real tree paths versus random sparse controls.
+- `06_hypothesis_iteration.ipynb` — performance and cost as iteration count changes.
+- `07_hypothesis_concatenation.ipynb` — concatenation versus replacement updates.
+- `08_hypothesis_sample_efficiency.ipynb` — labeled-data fractions and noisy-test robustness.
+- `09_hypothesis_cost_tradeoff.ipynb` — predictive quality versus time, memory, and model size.
+- `10_hypothesis_target_dimension.ipynb` — accuracy and storage across target dimensions.
+
+Each notebook prints an explicit exploratory verdict and stores its tables and plots after execution.
 
 ## Versioning and releases
 
