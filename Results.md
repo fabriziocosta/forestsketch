@@ -7,7 +7,7 @@ This document compiles the results printed by the executed hypothesis notebooks.
 | Study | Notebook | Result |
 | --- | --- | --- |
 | UMAP representation | `03_umap_representations.ipynb` | Visualization study; not a numbered hypothesis. |
-| Question 7: target dimension | `04_q7_hypothesis_target_dimension.ipynb` | A useful plateau was reached by d=1024; the fitted asymptote was 0.848. |
+| Question 7: target dimension | `04_q7_hypothesis_target_dimension.ipynb` | A useful plateau was reached by d=2048; the fitted power-law asymptote was 0.962. |
 | Question 8: expanding dimensionality | `05_q8_hypothesis_expanding_dimension.ipynb` | Inconclusive: expansion beat narrow fixed mode by 0.043, but lost 0.008 against the width-matched fixed control. |
 | Question 4: concatenation | `06_q4_hypothesis_concatenation.ipynb` | Technically supported by a 0.001 gain, but the practical effect was negligible. |
 | Question 3: iteration | `07_q3_hypothesis_iteration.ipynb` | Not supported: T=2 was worse than T=1 by 0.023, with 95% CI [-0.037, -0.010]. |
@@ -80,23 +80,18 @@ Forest Sketch was slower and used more memory while scoring below the original b
 
 ## Question 7 — target dimension
 
-The fixed 120-feature experiment doubled the target dimension from 8 through 8192. The raw random forest baseline reached 0.843 accuracy, with an uncompressed visited-node representation of 7,754 columns, indexed from 0 through 7,753.
+The fixed 120-feature experiment swept target dimensions from 8 through 8192, multiplying by four between measurements. The raw random forest baseline reached 0.843 accuracy, with an uncompressed visited-node representation of 7,754 columns, indexed from 0 through 7,753.
 
 | d | Mean accuracy | Standard deviation | Output MB | Serialized model MB |
 | ---: | ---: | ---: | ---: | ---: |
 | 8 | 0.592 | 0.026 | 0.081 | 2.794 |
-| 16 | 0.640 | 0.029 | 0.161 | 3.878 |
 | 32 | 0.660 | 0.015 | 0.322 | 6.241 |
-| 64 | 0.732 | 0.024 | 0.645 | 9.917 |
 | 128 | 0.728 | 0.018 | 1.289 | 17.059 |
-| 256 | 0.770 | 0.020 | 2.578 | 30.302 |
 | 512 | 0.807 | 0.010 | 5.156 | 56.273 |
-| 1024 | 0.841 | 0.012 | 10.312 | 102.101 |
 | 2048 | 0.835 | 0.008 | 20.625 | 193.447 |
-| 4096 | 0.851 | 0.015 | 41.250 | 366.549 |
 | 8192 | 0.848 | 0.013 | 82.500 | 690.940 |
 
-The best observed mean was 0.851 at d=4096. The smallest dimension within 0.02 of that best was d=1024. A bounded saturating fit estimated a horizontal asymptote of 0.848. Total wall-clock time was 74.2 seconds. Dimensions above 120 are valid but are no longer dimensionality-reducing relative to the original input.
+The best observed mean was 0.848 at d=8192. The smallest dimension within 0.02 of that best was d=2048. The saturating power-law fit $A - B/d^\\alpha$ estimated $A=0.962$, $B=0.555$, and $\\alpha=0.187$. Total wall-clock time was 37.3 seconds. Dimensions above 120 are valid but are no longer dimensionality-reducing relative to the original input.
 
 ## Question 8 — expanding dimensionality
 

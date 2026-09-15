@@ -165,7 +165,7 @@ Initial experiments should compare Forest Sketch with:
 
 Use the same train/test splits, target dimension, downstream model, and tuning budget wherever possible.
 
-The `notebooks/02_scaling_benchmarks.ipynb` notebook benchmarks wall-clock time, CPU time, and memory while scaling the number of samples and input features. The `notebooks/03_umap_representations.ipynb` notebook uses one-hot encoded Adult data to visualize the original, randomly projected, and iterative Forest Sketch representations with UMAP. Install the notebook extras with `python -m pip install -e '.[notebook]'` before running them.
+The `notebooks/02_scaling_benchmarks.ipynb` notebook benchmarks wall-clock time, CPU time, and memory while scaling the number of samples and input features. The `notebooks/03_umap_representations.ipynb` notebook uses one-hot encoded Adult data to visualize the original, randomly projected, and iterative Forest Sketch representations with UMAP. The `notebooks/13_dimension_iteration_curves.ipynb` notebook overlays the accuracy-versus-dimension curves for one, two, and three iterations. Install the notebook extras with `python -m pip install -e '.[notebook]'` before running them.
 
 The hypothesis studies are split into dedicated executable notebooks:
 
