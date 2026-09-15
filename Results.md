@@ -137,3 +137,33 @@ All 96 configurations completed successfully in 41.2 seconds. Across the full gr
 | Synthetic ($p=120$) | 64 | 8192 | 5072 | 0.844 | 0.774 |
 
 The result does not support a single universal choice based only on $p$, $m$, or an absolute 8k rule. It does support examining both normalized widths—especially $d/p$ and $d/m$—alongside accuracy and cost. The notebook’s real-data reference is encouraging, but the study remains exploratory: it uses classification, one downstream learner, bounded forest settings, and test-set comparisons. Larger real datasets and validation-based dimension selection are still needed before changing the other hypothesis notebooks.
+
+### Within-block analysis
+
+The follow-up analysis reran the full notebook and then removed the pooled factor mixing by analyzing each dataset × forest-size block separately. Each block contains 12 rows (six dimensions × two seeds). Spearman correlations of the accuracy gap to the raw forest were positive for both ratios in all eight blocks:
+
+| Dataset | Trees | ρ(log(d/p)) | ρ(log(d/m)) | Mean gap |
+| --- | ---: | ---: | ---: | ---: |
+| Breast cancer ($p=30$) | 16 | 0.838 | 0.794 | -0.013 |
+| Breast cancer ($p=30$) | 64 | 0.598 | 0.500 | -0.006 |
+| Synthetic ($p=12$) | 16 | 0.844 | 0.884 | -0.055 |
+| Synthetic ($p=12$) | 64 | 0.789 | 0.851 | -0.066 |
+| Synthetic ($p=120$) | 16 | 0.943 | 0.944 | -0.001 |
+| Synthetic ($p=120$) | 64 | 0.961 | 0.937 | -0.045 |
+| Synthetic ($p=48$) | 16 | 0.928 | 0.939 | -0.050 |
+| Synthetic ($p=48$) | 64 | 0.920 | 0.914 | -0.048 |
+
+The smallest observed ratios whose block-mean gap was at least -0.02 were:
+
+| Dataset | Trees | Minimum d/p (d) | Minimum d/m (d) |
+| --- | ---: | ---: | ---: |
+| Breast cancer ($p=30$) | 16 | 4.267 (128) | 0.307 (128) |
+| Breast cancer ($p=30$) | 64 | 1.067 (32) | 0.015 (32) |
+| Synthetic ($p=12$) | 16 | 170.667 (2048) | 2.078 (2048) |
+| Synthetic ($p=12$) | 64 | 682.667 (8192) | 2.240 (8192) |
+| Synthetic ($p=120$) | 16 | 1.067 (128) | 0.080 (128) |
+| Synthetic ($p=120$) | 64 | 4.267 (512) | 0.085 (512) |
+| Synthetic ($p=48$) | 16 | 42.667 (2048) | 1.662 (2048) |
+| Synthetic ($p=48$) | 64 | 42.667 (2048) | 0.415 (2048) |
+
+Thus the apparent `d/p` relationship survives as consistent descriptive within-block evidence in this grid, but it does not yield a stable threshold across blocks; `d/m` is also consistently increasing. The rerun completed all 96 configurations successfully in 48.4 seconds. Limitations remain two seeds, controlled datasets, one downstream learner, bounded forests, and exploratory use of held-out test results.
