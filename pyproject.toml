@@ -22,6 +22,11 @@ dependencies = [
 test = [
     "pytest>=7",
 ]
+notebook = [
+    "jupyter>=1.0",
+    "matplotlib>=3.6",
+    "pandas>=1.5",
+]
 
 [tool.setuptools.packages.find]
 include = ["forestsketch*"]

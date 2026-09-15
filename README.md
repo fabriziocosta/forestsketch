@@ -156,6 +156,8 @@ Initial experiments should compare Forest Sketch with:
 
 Use the same train/test splits, target dimension, downstream model, and tuning budget wherever possible.
 
+The `notebooks/02_scaling_benchmarks.ipynb` notebook benchmarks wall-clock time, CPU time, and memory while scaling the number of samples and input features. Install the notebook extras with `python -m pip install -e '.[notebook]'` before running it.
+
 ## Versioning and releases
 
 Forest Sketch follows semantic versioning with `MAJOR.MINOR.PATCH` versions. Releases are automated from pushes to the `main` branch using Conventional Commits:
