@@ -196,6 +196,7 @@ The hypothesis studies are split into dedicated executable notebooks:
 - `11_q5_hypothesis_sample_efficiency.ipynb` — Question 5: labeled-data fractions and noisy-test robustness.
 - `12_q6_hypothesis_cost_tradeoff.ipynb` — Question 6: predictive quality versus time, memory, and model size.
 - `15_openml_predictive_performance.ipynb` — standard random forest versus Recursive Sketch with one, two, and three iterations across a controlled OpenML-CC18 subset.
+- `17_recursive_sketch_2d_probabilities.ipynb` — class-probability heatmaps for Recursive Sketch plus logistic regression on the shared synthetic 2-D datasets; reusable code is in `notebooks/recursive_sketch_2d_probabilities.py`.
 
 The shared notebook utilities also provide `make_datasets(n=4, max_size=500)` for
 deterministically selecting OpenML-CC18 tasks and stratifying larger tasks down to
