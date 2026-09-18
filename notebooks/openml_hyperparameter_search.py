@@ -424,7 +424,7 @@ def _value_position(values, value):
 
 
 def plot_pairwise_performance(search_results, parameter_ranges, best_params):
-    """Plot lower-triangular pairwise performance with diagonal marginals."""
+    """Plot upper-triangular pairwise performance with diagonal marginals."""
 
     if search_results.empty:
         raise ValueError('search_results is empty; run the search before plotting pairwise results.')
@@ -438,6 +438,7 @@ def plot_pairwise_performance(search_results, parameter_ranges, best_params):
         figsize=(figure_size, figure_size),
         squeeze=False,
         constrained_layout=True,
+        sharex='col',
     )
     score = search_results['mean_accuracy']
     score_norm = plt.Normalize(vmin=score.min(), vmax=score.max())
@@ -450,7 +451,7 @@ def plot_pairwise_performance(search_results, parameter_ranges, best_params):
         y_values = list(parameter_ranges[y_parameter])
         for column, x_parameter in enumerate(parameters):
             axis = axes[row, column]
-            if row < column:
+            if row > column:
                 axis.set_visible(False)
                 continue
 
@@ -486,7 +487,8 @@ def plot_pairwise_performance(search_results, parameter_ranges, best_params):
                     axis.axvline(position, color='0.65', linestyle='--', linewidth=0.8)
                 if best_x is not None:
                     axis.axvline(best_x, color='red', linewidth=1.0)
-                axis.set_ylabel('Dataset-averaged accuracy')
+                if row == 0:
+                    axis.set_ylabel('Dataset-averaged accuracy')
             else:
                 pair_scores = (
                     search_results.groupby(
@@ -505,7 +507,7 @@ def plot_pairwise_performance(search_results, parameter_ranges, best_params):
                     pair_x,
                     pair_y,
                     c=pair_z,
-                    cmap='viridis',
+                    cmap='Blues_r',
                     norm=score_norm,
                     s=20,
                     alpha=0.65,
@@ -514,14 +516,61 @@ def plot_pairwise_performance(search_results, parameter_ranges, best_params):
                 unique_points = len(np.unique(np.column_stack([pair_x, pair_y]), axis=0))
                 if len(pair_z) >= 3 and unique_points >= 3:
                     try:
-                        triangulation = mtri.Triangulation(pair_x, pair_y)
+                        boundary_points = [
+                            (float(x_positions[0]), float(y_positions[0])),
+                            (float(x_positions[0]), float(y_positions[-1])),
+                            (float(x_positions[-1]), float(y_positions[0])),
+                            (float(x_positions[-1]), float(y_positions[-1])),
+                        ]
+                        observed_points = set(zip(pair_x, pair_y))
+                        added_points = [
+                            point
+                            for point in boundary_points
+                            if point not in observed_points
+                        ]
+                        contour_x = pair_x
+                        contour_y = pair_y
+                        contour_z = pair_z
+                        if added_points:
+                            added_values = np.array([
+                                pair_z[np.argmin(
+                                    (pair_x - point[0]) ** 2
+                                    + (pair_y - point[1]) ** 2
+                                )]
+                                for point in added_points
+                            ])
+                            contour_x = np.concatenate([
+                                pair_x,
+                                [point[0] for point in added_points],
+                            ])
+                            contour_y = np.concatenate([
+                                pair_y,
+                                [point[1] for point in added_points],
+                            ])
+                            contour_z = np.concatenate([pair_z, added_values])
+
+                        triangulation = mtri.Triangulation(
+                            contour_x,
+                            contour_y,
+                        )
+                        if contour_z.min() < contour_z.max():
+                            axis.tricontourf(
+                                triangulation,
+                                contour_z,
+                                levels=np.linspace(
+                                    contour_z.min(), contour_z.max(), 8
+                                ),
+                                cmap='Blues_r',
+                                norm=score_norm,
+                                alpha=0.55,
+                            )
                         drawn_levels = set()
                         for quantile, level, colour in iso_levels:
                             if level in drawn_levels or not (pair_z.min() <= level <= pair_z.max()):
                                 continue
                             contours = axis.tricontour(
                                 triangulation,
-                                pair_z,
+                                contour_z,
                                 levels=[level],
                                 colors=[colour],
                                 linewidths=1.5,
@@ -554,13 +603,24 @@ def plot_pairwise_performance(search_results, parameter_ranges, best_params):
                 ha='right',
                 fontsize=8,
             )
-            axis.set_yticks(y_positions)
-            axis.set_yticklabels([str(value) for value in y_values], fontsize=8)
-            axis.set_xlabel(x_parameter if row == n_parameters - 1 else '')
+            axis.tick_params(
+                axis='x',
+                labelbottom=row == column,
+            )
+            if row != column:
+                axis.set_yticks(y_positions)
+                if column == row + 1:
+                    axis.set_yticklabels([str(value) for value in y_values], fontsize=8)
+                else:
+                    axis.tick_params(axis='y', labelleft=False)
+            else:
+                axis.tick_params(axis='y', labelleft=row == 0)
+            axis.set_xlabel('')
             axis.set_title(y_parameter if row == column else '')
             axis.grid(alpha=0.2)
+            axis.set_box_aspect(1)
 
-    mappable = plt.cm.ScalarMappable(norm=score_norm, cmap='viridis')
+    mappable = plt.cm.ScalarMappable(norm=score_norm, cmap='Blues_r')
     mappable.set_array([])
     figure.colorbar(
         mappable,

@@ -5,6 +5,7 @@ from __future__ import annotations
 import pickle
 import sys
 import time
+import warnings
 from dataclasses import dataclass
 from numbers import Real
 from pathlib import Path
@@ -601,7 +602,17 @@ def serialized_size_mb(value):
 
 
 def classification_score(model, X_train, y_train, X_test, y_test):
-    model.fit(X_train, y_train)
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            'ignore',
+            message=(
+                r'The number of unique classes is greater than 50% of the '
+                r'number of samples\..*'
+            ),
+            category=UserWarning,
+            module=r'sklearn\.svm\._base',
+        )
+        model.fit(X_train, y_train)
     prediction = model.predict(X_test)
     return float(accuracy_score(y_test, prediction)), int(np.count_nonzero(prediction != y_test))
 
