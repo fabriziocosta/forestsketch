@@ -432,14 +432,30 @@ def plot_pairwise_performance(search_results, parameter_ranges, best_params):
     parameters = list(parameter_ranges)
     n_parameters = len(parameters)
     figure_size = max(12, 2.8 * n_parameters)
-    figure, axes = plt.subplots(
-        n_parameters,
-        n_parameters,
-        figsize=(figure_size, figure_size),
-        squeeze=False,
-        constrained_layout=True,
-        sharex='col',
+    panel_margin = 0.12
+    figure = plt.figure(figsize=(figure_size + 1, figure_size))
+    figure.subplots_adjust(
+        left=0.04,
+        right=0.97,
+        bottom=0.04,
+        top=0.96,
     )
+    grid = figure.add_gridspec(
+        n_parameters,
+        n_parameters + 2,
+        width_ratios=[1] * n_parameters + [0.5, 0.12],
+        wspace=0.25,
+        hspace=0.25,
+    )
+    axes = np.empty((n_parameters, n_parameters), dtype=object)
+    for row in range(n_parameters):
+        for column in range(n_parameters):
+            sharex = axes[0, column] if row else None
+            axes[row, column] = figure.add_subplot(
+                grid[row, column],
+                sharex=sharex,
+            )
+    colorbar_axis = figure.add_subplot(grid[:, -1])
     score = search_results['mean_accuracy']
     score_norm = plt.Normalize(vmin=score.min(), vmax=score.max())
     iso_levels = [
@@ -516,11 +532,19 @@ def plot_pairwise_performance(search_results, parameter_ranges, best_params):
                 unique_points = len(np.unique(np.column_stack([pair_x, pair_y]), axis=0))
                 if len(pair_z) >= 3 and unique_points >= 3:
                     try:
+                        x_bounds = (
+                            float(x_positions[0] - panel_margin),
+                            float(x_positions[-1] + panel_margin),
+                        )
+                        y_bounds = (
+                            float(y_positions[0] - panel_margin),
+                            float(y_positions[-1] + panel_margin),
+                        )
                         boundary_points = [
-                            (float(x_positions[0]), float(y_positions[0])),
-                            (float(x_positions[0]), float(y_positions[-1])),
-                            (float(x_positions[-1]), float(y_positions[0])),
-                            (float(x_positions[-1]), float(y_positions[-1])),
+                            (x_bounds[0], y_bounds[0]),
+                            (x_bounds[0], y_bounds[1]),
+                            (x_bounds[1], y_bounds[0]),
+                            (x_bounds[1], y_bounds[1]),
                         ]
                         observed_points = set(zip(pair_x, pair_y))
                         added_points = [
@@ -609,13 +633,31 @@ def plot_pairwise_performance(search_results, parameter_ranges, best_params):
             )
             if row != column:
                 axis.set_yticks(y_positions)
-                if column == row + 1:
-                    axis.set_yticklabels([str(value) for value in y_values], fontsize=8)
+                if column == n_parameters - 1:
+                    axis.yaxis.tick_right()
+                    axis.set_yticklabels(
+                        [str(value) for value in y_values],
+                        fontsize=8,
+                    )
+                    axis.tick_params(axis='y', labelleft=False, labelright=True)
                 else:
-                    axis.tick_params(axis='y', labelleft=False)
+                    axis.tick_params(axis='y', labelleft=False, labelright=False)
             else:
                 axis.tick_params(axis='y', labelleft=row == 0)
-            axis.set_xlabel('')
+            axis.set_xlim(
+                x_positions[0] - panel_margin,
+                x_positions[-1] + panel_margin,
+            )
+            if row != column:
+                axis.set_ylim(
+                    y_positions[0] - panel_margin,
+                    y_positions[-1] + panel_margin,
+                )
+            else:
+                axis.margins(y=0.08)
+            axis.set_xlabel(
+                x_parameter if row == 0 and row != column else ''
+            )
             axis.set_title(y_parameter if row == column else '')
             axis.grid(alpha=0.2)
             axis.set_box_aspect(1)
@@ -624,8 +666,7 @@ def plot_pairwise_performance(search_results, parameter_ranges, best_params):
     mappable.set_array([])
     figure.colorbar(
         mappable,
-        ax=axes,
-        shrink=0.65,
+        cax=colorbar_axis,
         label='Dataset-averaged accuracy',
     )
     figure.suptitle('Pairwise hyperparameter performance', y=0.995)
